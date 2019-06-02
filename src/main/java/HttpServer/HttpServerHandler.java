@@ -72,7 +72,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         MimetypesFileTypeMap mimeTypesMap = new MimetypesFileTypeMap();
         mimeTypesMap.addMimeTypes( "text/css css CSS" );
         mimeTypesMap.addMimeTypes( "text/javascript js JS map" );
-        System.out.println( file.getPath() );
+        //System.out.println( file.getPath() );
         response.headers().set( HttpHeaderNames.CONTENT_TYPE, mimeTypesMap.getContentType( file.getPath() ) );
     }
 
@@ -100,6 +100,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return;
         }
 
+        //System.out.println( request.method() );
+
         if ( GET.equals( request.method() ) ) {
             handleGet( ctx, request );
         } else if ( POST.equals( request.method() ) ) {
@@ -117,11 +119,14 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return;
         }
 
+        System.out.println( request.content().toString( CharsetUtil.UTF_8 ) );
     }
 
     private void handleGet ( ChannelHandlerContext ctx, FullHttpRequest request ) throws ParseException, IOException {
+
         final boolean keepAlive = HttpUtil.isKeepAlive( request );
         final String uri = request.uri();
+
         final String path = sanitizeUri( uri );
 
         //System.out.println( "check path: " + path );
@@ -169,7 +174,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         RandomAccessFile raf;
         try {
             raf = new RandomAccessFile( file, "r" );
-            System.out.println( "here" );
         } catch ( FileNotFoundException ignore ) {
             sendError( ctx, NOT_FOUND );
             return;
