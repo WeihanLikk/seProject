@@ -18,6 +18,7 @@ import java.util.*;
 import java.util.regex.Pattern;
 
 import static io.netty.handler.codec.http.HttpMethod.GET;
+import static io.netty.handler.codec.http.HttpMethod.POST;
 import static io.netty.handler.codec.http.HttpResponseStatus.*;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_0;
 import static io.netty.handler.codec.http.HttpVersion.HTTP_1_1;
@@ -101,7 +102,21 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         if ( GET.equals( request.method() ) ) {
             handleGet( ctx, request );
+        } else if ( POST.equals( request.method() ) ) {
+            handlePost( ctx, request );
         }
+    }
+
+    private void handlePost ( ChannelHandlerContext ctx, FullHttpRequest request ) {
+        final boolean keepAlive = HttpUtil.isKeepAlive( request );
+        final String uri = request.uri();
+        final String path = sanitizeUri( uri );
+
+        if ( path == null ) {
+            this.sendError( ctx, FORBIDDEN );
+            return;
+        }
+
     }
 
     private void handleGet ( ChannelHandlerContext ctx, FullHttpRequest request ) throws ParseException, IOException {
