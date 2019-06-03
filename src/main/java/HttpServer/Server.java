@@ -2,7 +2,6 @@ package HttpServer;
 
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
-import io.netty.channel.ChannelFuture;
 import io.netty.channel.EventLoopGroup;
 import io.netty.channel.nio.NioEventLoopGroup;
 import io.netty.channel.socket.nio.NioServerSocketChannel;
@@ -35,15 +34,15 @@ public class Server {
         EventLoopGroup workerGroup = new NioEventLoopGroup();
         try {
             ServerBootstrap b = new ServerBootstrap();
-            b.group(bossGroup, workerGroup)
-                    .channel(NioServerSocketChannel.class)
-                    .handler(new LoggingHandler( LogLevel.INFO))
-                    .childHandler(new serverInitializer(sslCtx));
+            b.group( bossGroup, workerGroup )
+                    .channel( NioServerSocketChannel.class )
+                    .handler( new LoggingHandler( LogLevel.INFO ) )
+                    .childHandler( new serverInitializer( sslCtx ) );
 
-            Channel ch = b.bind(PORT).sync().channel();
+            Channel ch = b.bind( PORT ).sync().channel();
 
-            System.err.println("Open your web browser and navigate to " +
-                    (SSL? "https" : "http") + "://127.0.0.1:" + PORT + '/');
+            System.err.println( "Open your web browser and navigate to " +
+                    ( SSL ? "https" : "http" ) + "://127.0.0.1:" + PORT + '/' );
 
             ch.closeFuture().sync();
 

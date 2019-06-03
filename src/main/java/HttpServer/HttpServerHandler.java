@@ -1,5 +1,7 @@
 package HttpServer;
 
+import DataBase.DataBase;
+import User.*;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
@@ -12,6 +14,7 @@ import io.netty.util.internal.SystemPropertyUtil;
 import javax.activation.MimetypesFileTypeMap;
 import java.io.*;
 import java.net.URLDecoder;
+import java.sql.SQLException;
 import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.*;
@@ -30,6 +33,19 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     public static final int HTTP_CACHE_SECONDS = 60;
     private static final Pattern INSECURE_URI = Pattern.compile( ".*[<>&\"].*" );
     private static final Pattern ALLOWED_FILE_NAME = Pattern.compile( "[^-\\._]?[^<>&\\\"]*" );
+    private static final Pattern STUDENT_ID = Pattern.compile( "^[3][0-9]*$" );
+    private static final Pattern TEACHER_ID = Pattern.compile( "^[1][0-9]*$" );
+    private static final Pattern TA_ID = Pattern.compile( "^[2][0-9]*$" );
+    private static final Pattern ADMIN_ID = Pattern.compile( "^[0][0-9]*$" );
+    private static DataBase db;
+    private static Administrator admin;
+
+    static {
+        db = new DataBase();
+        admin = new Administrator( (long) 1000, "admin", null, "admin" );
+        db.loadUserInfo();
+    }
+
     private FullHttpRequest request;
 
     private static String sanitizeUri ( String uri ) {
@@ -100,8 +116,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return;
         }
 
-        //System.out.println( request.method() );
-
         if ( GET.equals( request.method() ) ) {
             handleGet( ctx, request );
         } else if ( POST.equals( request.method() ) ) {
@@ -109,17 +123,27 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
     }
 
-    private void handlePost ( ChannelHandlerContext ctx, FullHttpRequest request ) {
-        final boolean keepAlive = HttpUtil.isKeepAlive( request );
-        final String uri = request.uri();
-        final String path = sanitizeUri( uri );
+    private void handlePost ( ChannelHandlerContext ctx, FullHttpRequest request ) throws IOException, ParseException, SQLException {
 
-        if ( path == null ) {
-            this.sendError( ctx, FORBIDDEN );
-            return;
+        String content = request.content().toString( CharsetUtil.UTF_8 );//.split( "&" );
+
+        String signin = "/client/html/signin/index.html";
+        String signup = "/client/html/signup/index.html";
+        String stumain = "/client/html/stumain/index.html";
+
+        if ( request.uri().equals( signin ) ) {
+            if ( userRegister( getPostInfo( content ) ) == -1 ) {
+                this.sendRedirect( ctx, signup );
+                return;
+            }
+        } else if ( request.uri().equals( stumain ) ) {
+            if ( userCheck( getPostInfo( content ) ) == -1 ) {
+                this.sendRedirect( ctx, signin );
+                return;
+            }
         }
 
-        System.out.println( request.content().toString( CharsetUtil.UTF_8 ) );
+        handleGet( ctx, request );
     }
 
     private void handleGet ( ChannelHandlerContext ctx, FullHttpRequest request ) throws ParseException, IOException {
@@ -239,6 +263,66 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
     }
 
+    private String[] getPostInfo ( String content ) {
+        String[] contents = URLDecoder.decode( content ).split( "&" );
+
+        for ( int i = 0; i < contents.length; i++ ) {
+            contents[ i ] = contents[ i ].substring( contents[ i ].lastIndexOf( "=" ) + 1 );
+        }
+
+        return contents;
+    }
+
+    private int userRegister ( String[] contents ) throws SQLException {
+        // TO DO judge the type of user
+        String id = contents[ 0 ];
+
+        if ( STUDENT_ID.matcher( id ).matches() ) {
+            Student stu = new Student( Long.parseLong( id ), "", contents[ 1 ], contents[ 2 ] );
+
+            //System.out.println( "id: " + id + " email: " + contents[ 1 ] + " P: " + contents[ 2 ] );
+            if ( db.insertInfo( stu ) == -1 ) {
+                return -1;
+            }
+            Student.addUser( stu );
+        } else if ( TEACHER_ID.matcher( id ).matches() ) {
+            Teacher teacher = new Teacher( Long.parseLong( id ), "", contents[ 1 ], contents[ 2 ] );
+            if ( db.insertInfo( teacher ) == -1 ) {
+                return -1;
+            }
+            Teacher.addUser( teacher );
+        } else if ( TA_ID.matcher( id ).matches() ) {
+            TA ta = new TA( Long.parseLong( id ), "", contents[ 1 ], contents[ 2 ] );
+            if ( db.insertInfo( ta ) == -1 ) {
+                return -1;
+            }
+            TA.addUser( ta );
+        } else if ( ADMIN_ID.matcher( id ).matches() ) {
+
+        }
+        return 0;
+    }
+
+    private int userCheck ( String[] contents ) throws SQLException {
+        String id = contents[ 0 ];
+        User user = null;
+        user = User.findUser( Long.parseLong( id ) );
+
+        if ( ADMIN_ID.matcher( id ).matches() ) {
+
+        }
+
+        if ( user == null ) {
+            return -1; // not find this user
+        }
+        if ( !user.getPassword().equals( contents[ 1 ] ) ) {
+            //System.out.println( "P: " + students.get( 0 ).getPassword() + "con1: " + contents[ 1 ] );
+            return -1;
+        }
+        user.setActive( true );
+        return 0;
+    }
+
     private void sendListing ( ChannelHandlerContext ctx, File dir, String dirPath ) {
         FullHttpResponse response = new DefaultFullHttpResponse( HTTP_1_1, OK );
         response.headers().set( HttpHeaderNames.CONTENT_TYPE, "text/html; charset=UTF-8" );
@@ -323,56 +407,4 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             flushPromise.addListener( ChannelFutureListener.CLOSE );
         }
     }
-
-//    private String getContent ( String url ) {
-//
-//        if ( url.equals( "/favicon.ico" ) ) {
-//            return "";
-//        }
-//
-//        try {
-//            System.out.println( url );
-//            BufferedReader buffer = new BufferedReader( new InputStreamReader( new FileInputStream( System.getProperty( "user.dir" ) + "/src/main" + url ), "UTF-8" ) );
-//            StringBuilder target = new StringBuilder();
-//            String line;
-//            while ( ( line = buffer.readLine() ) != null ) {
-//                target.append( line );
-//            }
-//            return target.toString();
-//        } catch ( IOException e ) {
-//            e.printStackTrace();
-//            return null;
-//        }
-//    }
-//
-//    private FullHttpResponse getResponse ( String content, HttpResponseStatus status, String contentType ) {
-//        ByteBuf target = Unpooled.copiedBuffer( content, CharsetUtil.UTF_8 );
-//        FullHttpResponse response = new DefaultFullHttpResponse( HttpVersion.HTTP_1_1, status, target );
-//        response.headers().set( HttpHeaderNames.CONTENT_TYPE, contentType );
-//
-//        //System.out.println( "length: " + target.readableBytes() );
-//        response.headers().set( HttpHeaderNames.CONTENT_LENGTH, target.readableBytes() );
-//
-//        return response;
-//    }
-//
-//    private String getContentType ( String url ) {
-//        String type = url.substring( url.lastIndexOf( "." ) );
-//
-//        System.out.println( "type is: " + type );
-//
-//        if ( type.equals( ".css" ) ) {
-//            return "text/css";
-//        } else if ( type.equals( ".js" ) ) {
-//            return "application/x-javascript";
-//        } else if ( type.equals( ".html" ) ) {
-//            return "text/html";
-//        } else if ( type.equals( ".ico" ) ) {
-//            return "image/png";
-//        } else {
-//            return "text/plain";
-//        }
-//    }
-
-
 }
