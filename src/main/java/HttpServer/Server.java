@@ -1,5 +1,6 @@
 package HttpServer;
 
+import DataBase.DataBase;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
@@ -14,13 +15,14 @@ import io.netty.handler.ssl.util.SelfSignedCertificate;
 
 import javax.net.ssl.SSLException;
 import java.security.cert.CertificateException;
+import java.sql.SQLException;
 
 public class Server {
 
     static final boolean SSL = System.getProperty( "ssl" ) != null;
     static final int PORT = Integer.parseInt( System.getProperty( "port", SSL ? "8443" : "8080" ) );
 
-    public static void main ( String[] args ) throws InterruptedException, CertificateException, SSLException {
+    public static void main ( String[] args ) throws InterruptedException, CertificateException, SSLException, SQLException {
         final SslContext sslCtx;
         if ( SSL ) {
             SelfSignedCertificate ssc = new SelfSignedCertificate();
@@ -29,6 +31,8 @@ public class Server {
         } else {
             sslCtx = null;
         }
+
+        DataBase.loadInfo();
 
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();

@@ -1,12 +1,16 @@
 package User;
 
+import io.netty.channel.ChannelHandlerContext;
+
 import java.util.HashMap;
 
 public class User {
     private static HashMap<Long, User> userHashMap;
+    private static HashMap<ChannelHandlerContext, User> channelHashMap;
 
     static {
         userHashMap = new HashMap<Long, User>();
+        channelHashMap = new HashMap<ChannelHandlerContext, User>();
     }
 
     private long id;
@@ -29,6 +33,11 @@ public class User {
     public static void addUser ( User user ) {
         userHashMap.put( user.getId(), user );
     }
+
+    public static void bindUser ( ChannelHandlerContext ctx, User user ) {
+        channelHashMap.put( ctx, user );
+    }
+
 
     public String getUserType () {
         return "User";

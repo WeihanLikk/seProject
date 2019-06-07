@@ -1,7 +1,12 @@
 package HttpServer;
 
+import Course.Course;
 import DataBase.DataBase;
+import Homework.Homework;
+import Question.Question;
 import User.*;
+import com.alibaba.fastjson.JSONArray;
+import com.alibaba.fastjson.JSONObject;
 import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
@@ -37,13 +42,32 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private static final Pattern TEACHER_ID = Pattern.compile( "^[1][0-9]*$" );
     private static final Pattern TA_ID = Pattern.compile( "^[2][0-9]*$" );
     private static final Pattern ADMIN_ID = Pattern.compile( "^[0][0-9]*$" );
+    private static HashMap<String, JsonHandler> jsonHandlerHashMap;
     private static DataBase db;
     private static Administrator admin;
 
     static {
         db = new DataBase();
         admin = new Administrator( (long) 1000, "admin", null, "admin" );
-        db.loadUserInfo();
+
+        jsonHandlerHashMap = new HashMap<>();
+
+        jsonHandlerHashMap.put( "/client/json/course/", ( ( channel ) -> {
+            JSONObject jsonObject = new JSONObject( true );
+            JSONArray course = new JSONArray();
+            List<Course> courseArrayList = Course.getCourseList();
+            for ( Course co : courseArrayList ) {
+                course.add( co.getName() );
+            }
+            jsonObject.put( "courses", course );
+            System.out.println( "Json: " + jsonObject );
+            return jsonObject.toJSONString();
+        } ) );
+
+        jsonHandlerHashMap.put( "/client/json/questions/", ( channel -> Question.allToJsonObject().toJSONString() ) );
+
+        jsonHandlerHashMap.put( "/client/json/homework/generate/", channel -> Homework.getLastHw().toJsonObject().toJSONString() );
+
     }
 
     private FullHttpRequest request;
@@ -89,6 +113,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         mimeTypesMap.addMimeTypes( "text/css css CSS" );
         mimeTypesMap.addMimeTypes( "text/javascript js JS map" );
         //System.out.println( file.getPath() );
+        //System.out.println( mimeTypesMap.getContentType( file.getPath() ) );
         response.headers().set( HttpHeaderNames.CONTENT_TYPE, mimeTypesMap.getContentType( file.getPath() ) );
     }
 
@@ -130,6 +155,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         String signin = "/client/html/signin/index.html";
         String signup = "/client/html/signup/index.html";
         String stumain = "/client/html/stumain/index.html";
+        String stuhw = "/client/json/homework/generate/";
 
         if ( request.uri().equals( signin ) ) {
             if ( userRegister( getPostInfo( content ) ) == -1 ) {
@@ -137,10 +163,12 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 return;
             }
         } else if ( request.uri().equals( stumain ) ) {
-            if ( userCheck( getPostInfo( content ) ) == -1 ) {
+            if ( userLogin( getPostInfo( content ), ctx ) == -1 ) {
                 this.sendRedirect( ctx, signin );
                 return;
             }
+        } else if ( request.uri().equals( stuhw ) ) {
+            homeworkGenerate( getPostInfo( content ) );
         }
 
         handleGet( ctx, request );
@@ -152,6 +180,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         final String uri = request.uri();
 
         final String path = sanitizeUri( uri );
+
+        //System.out.println( uri );
 
         //System.out.println( "check path: " + path );
         if ( path == null ) {
@@ -167,7 +197,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         if ( file.isDirectory() ) {
             if ( uri.endsWith( "/" ) ) {
-                this.sendListing( ctx, file, uri );
+                this.sendJson( ctx, uri );
+                //this.sendListing( ctx, file, uri );
             } else {
                 this.sendRedirect( ctx, uri + '/' );
             }
@@ -281,19 +312,19 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             Student stu = new Student( Long.parseLong( id ), "", contents[ 1 ], contents[ 2 ] );
 
             //System.out.println( "id: " + id + " email: " + contents[ 1 ] + " P: " + contents[ 2 ] );
-            if ( db.insertInfo( stu ) == -1 ) {
+            if ( db.insertUserInfo( stu ) == -1 ) {
                 return -1;
             }
             Student.addUser( stu );
         } else if ( TEACHER_ID.matcher( id ).matches() ) {
             Teacher teacher = new Teacher( Long.parseLong( id ), "", contents[ 1 ], contents[ 2 ] );
-            if ( db.insertInfo( teacher ) == -1 ) {
+            if ( db.insertUserInfo( teacher ) == -1 ) {
                 return -1;
             }
             Teacher.addUser( teacher );
         } else if ( TA_ID.matcher( id ).matches() ) {
             TA ta = new TA( Long.parseLong( id ), "", contents[ 1 ], contents[ 2 ] );
-            if ( db.insertInfo( ta ) == -1 ) {
+            if ( db.insertUserInfo( ta ) == -1 ) {
                 return -1;
             }
             TA.addUser( ta );
@@ -303,7 +334,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         return 0;
     }
 
-    private int userCheck ( String[] contents ) throws SQLException {
+    private int userLogin ( String[] contents, ChannelHandlerContext ctx ) {
         String id = contents[ 0 ];
         User user = null;
         user = User.findUser( Long.parseLong( id ) );
@@ -320,8 +351,40 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return -1;
         }
         user.setActive( true );
+        User.bindUser( ctx, user );
         return 0;
     }
+
+    private void homeworkGenerate ( String[] contents ) {
+        Homework homework = new Homework( Homework.geneId() );
+        for ( int i = 0; i < contents.length; i++ ) {
+            Question question = Question.getQuestion( Integer.parseInt( contents[ i ] ) );
+            if ( question != null ) {
+                homework.addQuestion( question );
+            }
+        }
+        homework.setLastId();
+        homework.setTotalMarks();
+        Homework.addHomework( homework );
+    }
+
+
+    private void sendJson ( ChannelHandlerContext ctx, String uri ) {
+        System.out.println( "check in sendJson: " + uri );
+
+        if ( jsonHandlerHashMap.containsKey( uri ) ) {
+            String json = jsonHandlerHashMap.get( uri ).jsonHandler( ctx.channel() );
+            FullHttpResponse response = new DefaultFullHttpResponse( HTTP_1_1, OK );
+            response.headers().set( HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8" );
+            ByteBuf buffer = Unpooled.copiedBuffer( json, CharsetUtil.UTF_8 );
+            response.content().writeBytes( buffer );
+            buffer.release();
+
+            this.sendAndCleanupConnection( ctx, response );
+        }
+
+    }
+
 
     private void sendListing ( ChannelHandlerContext ctx, File dir, String dirPath ) {
         FullHttpResponse response = new DefaultFullHttpResponse( HTTP_1_1, OK );
