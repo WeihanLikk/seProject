@@ -1,6 +1,6 @@
 package HttpServer;
 
-import Course.Course;
+import Class._Class;
 import DataBase.DataBase;
 import Homework.Homework;
 import Question.Question;
@@ -42,31 +42,56 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private static final Pattern TEACHER_ID = Pattern.compile( "^[1][0-9]*$" );
     private static final Pattern TA_ID = Pattern.compile( "^[2][0-9]*$" );
     private static final Pattern ADMIN_ID = Pattern.compile( "^[0][0-9]*$" );
+    private static final Pattern CLASS_STR = Pattern.compile( "^/client/class/.*" );
     private static HashMap<String, JsonHandler> jsonHandlerHashMap;
     private static DataBase db;
     private static Administrator admin;
 
     static {
         db = new DataBase();
+        db.loadInfo();
         admin = new Administrator( (long) 1000, "admin", null, "admin" );
 
         jsonHandlerHashMap = new HashMap<>();
 
-        jsonHandlerHashMap.put( "/client/json/course/", ( ( channel ) -> {
+        jsonHandlerHashMap.put( "/client/json/course/", ( ( channel, request, contents ) -> {
+            System.out.println( "show the id: " + channel.id().asLongText() );
+
+            ArrayList<_Class> arrayList = User.getUser( channel.id().asLongText() ).getClassArrayList();
+
             JSONObject jsonObject = new JSONObject( true );
-            JSONArray course = new JSONArray();
-            List<Course> courseArrayList = Course.getCourseList();
-            for ( Course co : courseArrayList ) {
-                course.add( co.getName() );
+            JSONArray classes = new JSONArray();
+            for ( _Class co : arrayList ) {
+                classes.add( co.getName() );
             }
-            jsonObject.put( "courses", course );
+            jsonObject.put( "courses", classes );
             System.out.println( "Json: " + jsonObject );
             return jsonObject.toJSONString();
         } ) );
 
-        jsonHandlerHashMap.put( "/client/json/questions/", ( channel -> Question.allToJsonObject().toJSONString() ) );
+        jsonHandlerHashMap.put( "/client/json/questions/", ( ( channel, request, contents ) -> Question.allToJsonObject().toJSONString() ) );
 
-        jsonHandlerHashMap.put( "/client/json/homework/generate/", channel -> Homework.getLastHw().toJsonObject().toJSONString() );
+        jsonHandlerHashMap.put( "/client/json/homework/generate/", ( channel, request, contents ) -> {
+
+            Homework homework = new Homework( Homework.geneId(), contents[ 1 ] ); // 1 for hw name
+
+            for ( int i = 2; i < contents.length; i++ ) {
+                Question question = Question.getQuestion( Integer.parseInt( contents[ i ] ) );
+                if ( question != null ) {
+                    homework.addQuestion( question );
+                }
+            }
+
+            _Class.get_Class( Long.parseLong( contents[ 0 ] ) ).addHomeWork( homework ); // 0 for class id
+
+            homework.setTotalMarks();
+            Homework.addHomework( homework );
+
+            return homework.toJsonObject().toJSONString();
+        } );
+
+        jsonHandlerHashMap.put( "/client/json/homework/list/", ( channel, request, contents ) ->
+                _Class.get_Class( Long.parseLong( contents[ 0 ] ) ).toHomeworkList().toJSONString() );
 
     }
 
@@ -133,6 +158,17 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 HttpHeaderNames.LAST_MODIFIED, dateFormatter.format( new Date( fileToCache.lastModified() ) ) );
     }
 
+    private String[] getPostInfo ( String content ) {
+        String[] contents = URLDecoder.decode( content ).split( "&" );
+
+        for ( int i = 0; i < contents.length; i++ ) {
+            contents[ i ] = contents[ i ].substring( contents[ i ].lastIndexOf( "=" ) + 1 );
+        }
+
+        return contents;
+    }
+
+
     @Override
     protected void channelRead0 ( ChannelHandlerContext ctx, FullHttpRequest request ) throws Exception {
         this.request = request;
@@ -154,22 +190,28 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         String signin = "/client/html/signin/index.html";
         String signup = "/client/html/signup/index.html";
-        String stumain = "/client/html/stumain/index.html";
-        String stuhw = "/client/json/homework/generate/";
+        String stumain = "/client/html/student/stumain/index.html";
+//        String stuhw = "/client/json/homework/generate/";
+//        String stuhwList = "/client/json/homework/list/";
+//        String stuhwJudge = "/client/json/homework/summarize/";
 
-        if ( request.uri().equals( signin ) ) {
+        String uri = request.uri();
+        if ( uri.equals( signin ) ) {
             if ( userRegister( getPostInfo( content ) ) == -1 ) {
                 this.sendRedirect( ctx, signup );
                 return;
             }
-        } else if ( request.uri().equals( stumain ) ) {
+        } else if ( uri.equals( stumain ) ) {
             if ( userLogin( getPostInfo( content ), ctx ) == -1 ) {
                 this.sendRedirect( ctx, signin );
                 return;
             }
-        } else if ( request.uri().equals( stuhw ) ) {
-            homeworkGenerate( getPostInfo( content ) );
         }
+//        else if ( uri.equals( stuhw ) ) {
+//            homeworkGenerate( getPostInfo( content ) );
+//        } else if ( uri.equals( stuhwList ) ) {
+//            homeworkList( getPostInfo( content ) );
+//        }
 
         handleGet( ctx, request );
     }
@@ -181,12 +223,13 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         final String path = sanitizeUri( uri );
 
-        //System.out.println( uri );
-
-        //System.out.println( "check path: " + path );
         if ( path == null ) {
             this.sendError( ctx, FORBIDDEN );
             return;
+        }
+
+        if ( CLASS_STR.matcher( uri ).matches() ) {
+            this.sendRedirect( ctx, "/client/html/student/stucourse/index.html" );
         }
 
         File file = new File( path );
@@ -197,7 +240,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         if ( file.isDirectory() ) {
             if ( uri.endsWith( "/" ) ) {
-                this.sendJson( ctx, uri );
+                this.sendJson( ctx, uri, request );
                 //this.sendListing( ctx, file, uri );
             } else {
                 this.sendRedirect( ctx, uri + '/' );
@@ -294,14 +337,12 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
     }
 
-    private String[] getPostInfo ( String content ) {
-        String[] contents = URLDecoder.decode( content ).split( "&" );
-
-        for ( int i = 0; i < contents.length; i++ ) {
-            contents[ i ] = contents[ i ].substring( contents[ i ].lastIndexOf( "=" ) + 1 );
-        }
-
-        return contents;
+    @Override
+    public void channelUnregistered ( ChannelHandlerContext ctx ) throws Exception {
+        super.channelUnregistered( ctx );
+        System.out.println( "Channel removed: " + ctx.channel().id() );
+        User.removeBind( ctx.channel().id().asLongText() );
+        //this.sendRedirect( ctx, "/client/html/signin/index.html" );
     }
 
     private int userRegister ( String[] contents ) throws SQLException {
@@ -336,7 +377,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     private int userLogin ( String[] contents, ChannelHandlerContext ctx ) {
         String id = contents[ 0 ];
-        User user = null;
+        User user;
         user = User.findUser( Long.parseLong( id ) );
 
         if ( ADMIN_ID.matcher( id ).matches() ) {
@@ -351,29 +392,19 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return -1;
         }
         user.setActive( true );
-        User.bindUser( ctx, user );
+        System.out.println( "Channel bind: " + ctx.channel().id() );
+        User.bindUser( ctx.channel().id().asLongText(), user );
         return 0;
     }
 
-    private void homeworkGenerate ( String[] contents ) {
-        Homework homework = new Homework( Homework.geneId() );
-        for ( int i = 0; i < contents.length; i++ ) {
-            Question question = Question.getQuestion( Integer.parseInt( contents[ i ] ) );
-            if ( question != null ) {
-                homework.addQuestion( question );
-            }
-        }
-        homework.setLastId();
-        homework.setTotalMarks();
-        Homework.addHomework( homework );
-    }
 
-
-    private void sendJson ( ChannelHandlerContext ctx, String uri ) {
+    private void sendJson ( ChannelHandlerContext ctx, String uri, FullHttpRequest request ) {
         System.out.println( "check in sendJson: " + uri );
 
+        String[] contents = getPostInfo( request.content().toString( CharsetUtil.UTF_8 ) );
+
         if ( jsonHandlerHashMap.containsKey( uri ) ) {
-            String json = jsonHandlerHashMap.get( uri ).jsonHandler( ctx.channel() );
+            String json = jsonHandlerHashMap.get( uri ).jsonHandler( ctx.channel(), request, contents );
             FullHttpResponse response = new DefaultFullHttpResponse( HTTP_1_1, OK );
             response.headers().set( HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8" );
             ByteBuf buffer = Unpooled.copiedBuffer( json, CharsetUtil.UTF_8 );
@@ -382,6 +413,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             this.sendAndCleanupConnection( ctx, response );
         }
+
 
     }
 

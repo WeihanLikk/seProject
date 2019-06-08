@@ -3,23 +3,26 @@ package Question;
 import com.alibaba.fastjson.JSONArray;
 import com.alibaba.fastjson.JSONObject;
 
-import java.util.HashMap;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Question {
 
-    private static HashMap<Integer, Question> allQuestions;
+    private static ConcurrentHashMap<Integer, Question> allQuestions;
 
     static {
-        allQuestions = new HashMap<>();
+        allQuestions = new ConcurrentHashMap<>();
     }
 
     private int id;
     private int mark;
     private String content;
     private String answer;
+    private String type;
+    private String[] choices;
 
-    public Question ( int id ) {
+    public Question ( int id, String type ) {
         this.id = id;
+        this.type = type;
     }
 
     public static void addQuestion ( Question question ) {
@@ -27,7 +30,7 @@ public class Question {
     }
 
 
-    public static HashMap<Integer, Question> getAllQuestions () {
+    public static ConcurrentHashMap<Integer, Question> getAllQuestions () {
         return allQuestions;
     }
 
@@ -59,6 +62,10 @@ public class Question {
         this.mark = mark;
     }
 
+    public void setChoices ( String[] cs ) {
+        this.choices = cs;
+    }
+
     public int getId () {
         return id;
     }
@@ -82,6 +89,16 @@ public class Question {
     public JSONObject toJsonObject () {
         JSONObject question = new JSONObject( true );
         question.put( "content", content );
+        question.put( "type", type );
+        if ( type.equals( "choice" ) ) {
+            question.put( "choiceA", choices[ 0 ] );
+            question.put( "choiceB", choices[ 1 ] );
+            question.put( "choiceC", choices[ 2 ] );
+            question.put( "choiceD", choices[ 3 ] );
+        } else {
+            question.put( "choiceA", "T" );
+            question.put( "choiceB", "F" );
+        }
         question.put( "answer", answer );
         return question;
     }

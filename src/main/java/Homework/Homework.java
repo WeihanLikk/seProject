@@ -6,25 +6,26 @@ import com.alibaba.fastjson.JSONObject;
 
 import javax.xml.crypto.Data;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class Homework {
-    private static HashMap<Integer, Homework> homeworkList;
-    private static int lastId = 0;
+    private static ConcurrentHashMap<Long, Homework> homeworkList;
 
     static {
-        homeworkList = new HashMap<>();
+        homeworkList = new ConcurrentHashMap<>();
     }
 
-    private int id;
+    private long id;
+    private String name;
     private List<Question> questionList;
     private int type;
     private int totalMarks;
     private Data createData, deadLine;
 
-    public Homework ( int id ) {
+    public Homework ( int id, String name ) {
         this.id = id;
+        this.name = name;
         questionList = new ArrayList<>();
         type = -1;
     }
@@ -37,23 +38,17 @@ public class Homework {
         return homeworkList.size();
     }
 
-    public static Homework getLastHw () {
-        if ( homeworkList.containsKey( lastId ) ) {
-            return homeworkList.get( lastId );
-        }
-        return null;
-    }
 
-    public void setLastId () {
-        lastId = this.id;
-    }
-
-    public int getId () {
+    public long getId () {
         return id;
     }
 
     public void setId ( int id ) {
         this.id = id;
+    }
+
+    public String getName () {
+        return this.name;
     }
 
     public void setCreateData ( Data createData ) {

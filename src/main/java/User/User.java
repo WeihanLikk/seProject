@@ -1,18 +1,20 @@
 package User;
 
-import io.netty.channel.ChannelHandlerContext;
+import Class._Class;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class User {
-    private static HashMap<Long, User> userHashMap;
-    private static HashMap<ChannelHandlerContext, User> channelHashMap;
+    private static ConcurrentHashMap<Long, User> userHashMap;
+    private static ConcurrentHashMap<String, User> channelUserConcurrentHashMap;
 
     static {
-        userHashMap = new HashMap<Long, User>();
-        channelHashMap = new HashMap<ChannelHandlerContext, User>();
+        userHashMap = new ConcurrentHashMap<Long, User>();
+        channelUserConcurrentHashMap = new ConcurrentHashMap<>();
     }
 
+    private ArrayList<_Class> classArrayList;
     private long id;
     private String name;
     private String email;
@@ -34,10 +36,29 @@ public class User {
         userHashMap.put( user.getId(), user );
     }
 
-    public static void bindUser ( ChannelHandlerContext ctx, User user ) {
-        channelHashMap.put( ctx, user );
+    public static void bindUser ( String id, User user ) {
+        if ( channelUserConcurrentHashMap.containsKey( id ) ) {
+            channelUserConcurrentHashMap.remove( id );
+        }
+        channelUserConcurrentHashMap.put( id, user );
     }
 
+    public static void removeBind ( String channel ) {
+        channelUserConcurrentHashMap.remove( channel );
+    }
+
+    public static User getUser ( String channel ) {
+        return channelUserConcurrentHashMap.getOrDefault( channel, null );
+    }
+
+
+    public void addClasses ( ArrayList<_Class> classes ) {
+        classArrayList = classes;
+    }
+
+    public ArrayList<_Class> getClassArrayList () {
+        return classArrayList;
+    }
 
     public String getUserType () {
         return "User";

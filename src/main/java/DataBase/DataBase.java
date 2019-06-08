@@ -11,12 +11,37 @@ import java.sql.*;
 import java.util.ArrayList;
 
 public class DataBase {
-    private static Connection connection = null;
 
-    static {
+//    static {
+//        try {
+//            Class.forName( "org.sqlite.JDBC" );
+//            connection = DriverManager.getConnection( "jdbc:sqlite:SeProject.db" );
+//        } catch ( Exception e ) {
+//            System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+//            System.exit( 0 );
+//        }
+//
+//        try {
+//            initUserTable( "STUDENT" );
+//            initUserTable( "TEACHER" );
+//            initUserTable( "TA" );
+//            initCourseTable();
+//            initClassTable();
+//            intiQuestionTable();
+//            intiHomeWorkTable();
+//            initStuClassTable();
+//
+//        } catch ( SQLException e ) {
+//            e.printStackTrace();
+//        }
+//    }
+
+    private Connection c = null;
+
+    public DataBase () {
         try {
             Class.forName( "org.sqlite.JDBC" );
-            connection = DriverManager.getConnection( "jdbc:sqlite:SeProject.db" );
+            c = DriverManager.getConnection( "jdbc:sqlite:SeProject.db" );
         } catch ( Exception e ) {
             System.err.println( e.getClass().getName() + ": " + e.getMessage() );
             System.exit( 0 );
@@ -30,68 +55,20 @@ public class DataBase {
             initClassTable();
             intiQuestionTable();
             intiHomeWorkTable();
+            initUserClassTable( "STUCLASS" );
+            initUserClassTable( "TEACLASS" );
+            initUserClassTable( "TACLASS" );
 
         } catch ( SQLException e ) {
             e.printStackTrace();
         }
-    }
-
-    private Connection c = null;
-
-    public DataBase () {
-        try {
-            Class.forName( "org.sqlite.JDBC" );
-            c = DriverManager.getConnection( "jdbc:sqlite:SeProject.db" );
-        } catch ( Exception e ) {
-            System.err.println( e.getClass().getName() + ": " + e.getMessage() );
-            System.exit( 0 );
-        }
-
 
     }
 
-    public static void loadInfo () throws SQLException {
-
-
-        ArrayList<User> students = null;
-        ArrayList<User> teachers = null;
-        ArrayList<User> tas = null;
-        ArrayList<Course> courses = null;
-        ArrayList<_Class> classes = null;
-
-        try {
-            students = selectUserAll( "STUDENT" );
-            teachers = selectUserAll( "TEACHER" );
-            tas = selectUserAll( "TA" );
-            courses = selectCourseAll();
-            classes = selectClassAll();
-        } catch ( SQLException e ) {
-            e.printStackTrace();
-        }
-
-        for ( User stu : students ) {
-            Student.addUser( stu );
-        }
-        for ( User tea : teachers ) {
-            Teacher.addUser( tea );
-        }
-        for ( User ta : tas ) {
-            TA.addUser( ta );
-        }
-        for ( Course course : courses ) {
-            Course.addCourse( course );
-        }
-        for ( _Class _class : classes ) {
-            _Class.addClass( _class );
-        }
-
-        connection.close();
-    }
-
-    public static ArrayList<User> selectUserAll ( String userType ) throws SQLException {
+    public ArrayList<User> selectUserAll ( String userType ) throws SQLException {
         String sql = "SELECT * FROM " + userType;
 
-        Statement stmt = connection.createStatement();
+        Statement stmt = c.createStatement();
         ResultSet rs = stmt.executeQuery( sql );
         ArrayList<User> users = new ArrayList<>();
 
@@ -109,10 +86,34 @@ public class DataBase {
         return users;
     }
 
-    public static ArrayList<Course> selectCourseAll () throws SQLException {
+    public ArrayList<_Class> selectUserClassAll ( String name, long id ) throws SQLException {
+        String sql = "SELECT * FROM " + name + " WHERE UserID = ?";
+
+        PreparedStatement ps = c.prepareStatement( sql );
+
+        ps.setLong( 1, id );
+
+        ResultSet rs = ps.executeQuery();
+
+        ArrayList<_Class> classes = new ArrayList<>();
+
+        while ( rs.next() ) {
+            classes.add( new _Class(
+                    rs.getLong( "ClassID" ),
+                    rs.getString( "ClassName" ),
+                    rs.getString( "ClassDesc" )
+            ) );
+        }
+
+        ps.close();
+        rs.close();
+        return classes;
+    }
+
+    public ArrayList<Course> selectCourseAll () throws SQLException {
         String sql = "SELECT * FROM COURSE";
 
-        Statement stmt = connection.createStatement();
+        Statement stmt = c.createStatement();
         ResultSet rs = stmt.executeQuery( sql );
         ArrayList<Course> courses = new ArrayList<>();
 
@@ -130,10 +131,10 @@ public class DataBase {
         return courses;
     }
 
-    public static ArrayList<_Class> selectClassAll () throws SQLException {
+    public ArrayList<_Class> selectClassAll () throws SQLException {
         String sql = "SELECT * FROM CLASS";
 
-        Statement stmt = connection.createStatement();
+        Statement stmt = c.createStatement();
         ResultSet rs = stmt.executeQuery( sql );
         ArrayList<_Class> classes = new ArrayList<>();
 
@@ -141,8 +142,7 @@ public class DataBase {
             classes.add( new _Class(
                     rs.getLong( "ClassId" ),
                     rs.getString( "ClassName" ),
-                    rs.getString( "ClassDesc" ),
-                    rs.getString( "ClassNote" )
+                    rs.getString( "ClassDesc" )
             ) );
         }
 
@@ -151,14 +151,14 @@ public class DataBase {
         return classes;
     }
 
-    public static void initUserTable ( String userType ) throws SQLException {
+    public void initUserTable ( String userType ) throws SQLException {
         String sql = "CREATE TABLE IF NOT EXISTS " + userType +
                 " ( UserID      LONG      PRIMARY KEY   NOT NULL," +
                 " UserName     VARCHAR(45)  NOT NULL, " +
                 " Password        CHAR(16)     NOT NULL, " +
                 " Email           VARCHAR(45)  DEFAULT NULL)";
 
-        Statement stmt = connection.createStatement();
+        Statement stmt = c.createStatement();
 
         if ( stmt.execute( sql ) ) {
             System.out.println( "create table: " + userType );
@@ -167,14 +167,34 @@ public class DataBase {
         stmt.close();
     }
 
-    public static void intiQuestionTable () throws SQLException {
+    public void initUserClassTable ( String name ) throws SQLException {
+        String sql = "CREATE TABLE IF NOT EXISTS " + name +
+                " ( UserID      LONG      NOT NULL," +
+                "   ClassID     LONG      NOT NULL, " +
+                "   ClassName   VARCHAR(50) NOT NULL," +
+                "   ClassDesc   VARCHAR(100)     DEFAULT NULL)";
+
+        Statement stmt = c.createStatement();
+
+        if ( stmt.execute( sql ) ) {
+            System.out.println( "create table: " + name );
+        }
+
+        stmt.close();
+    }
+
+    public void intiQuestionTable () throws SQLException {
         String sql = "CREATE TABLE IF NOT EXISTS QUESTION" +
                 " ( QuestionId      LONG      PRIMARY KEY   NOT NULL," +
                 " Content     VARCHAR(100)  NOT NULL, " +
-                " Answer        VARCHAR(50)     NOT NULL, " +
-                " Choice        VARCHAR(50)  NOT NULL)";
+                " Answer        CHAR(5)     NOT NULL, " +
+                " TYEP          CHAR(10)    NOT NULL," +
+                " ChoiceA        VARCHAR(50)  NOT NULL," +
+                " ChoiceB        VARCHAR(50)  NOT NULL," +
+                " ChoiceC        VARCHAR(50)  NOT NULL," +
+                " ChoiceD        VARCHAR(50)  NOT NULL)";
 
-        Statement stmt = connection.createStatement();
+        Statement stmt = c.createStatement();
 
         if ( stmt.execute( sql ) ) {
             System.out.println( "create table question" );
@@ -183,33 +203,13 @@ public class DataBase {
         stmt.close();
     }
 
-    public static void intiHomeWorkTable () throws SQLException {
-        String sql = "CREATE TABLE IF NOT EXISTS HOMEWORK" +
-                " ( HomeWorkId      LONG      PRIMARY KEY   NOT NULL," +
-                " QuestionList     VARCHAR(100)  NOT NULL, " +
-                " CreateDate        VARCHAR(20)  DEFAULT NULL, " +
-                " DeadLine        VARCHAR(20)  DEFAULT NULL)";
-
-        Statement stmt = connection.createStatement();
-
-        if ( stmt.execute( sql ) ) {
-            System.out.println( "create table homework" );
-        }
-
-        stmt.close();
-    }
-
-
-    public static void initClassTable () throws SQLException {
+    public void initClassTable () throws SQLException {
         String sql = "CREATE TABLE IF NOT EXISTS CLASS" +
                 " ( ClassId      LONG      PRIMARY KEY   NOT NULL," +
-                " CourseId        LONG      NOT NULL," +
-                " ClassName     VARCHAR(45)  NOT NULL, " +
-                " ClassDesc       VARCHAR(200) DEFAULT NULL, " +
-                " ClassNote       VARCHAR(200)  DEFAULT NULL, " +
-                " FOREIGN KEY(CourseId) REFERENCES COURSE(CourseId)   )";
+                " ClassName     VARCHAR(50)  NOT NULL, " +
+                " ClassDesc       VARCHAR(100) DEFAULT NULL)";
 
-        Statement stmt = connection.createStatement();
+        Statement stmt = c.createStatement();
 
         if ( stmt.execute( sql ) ) {
             System.out.println( "create table class" );
@@ -218,20 +218,83 @@ public class DataBase {
         stmt.close();
     }
 
-    public static void initCourseTable () throws SQLException {
+    public void intiHomeWorkTable () throws SQLException {
+        String sql = "CREATE TABLE IF NOT EXISTS HOMEWORK" +
+                " ( HomeWorkId      LONG      PRIMARY KEY   NOT NULL," +
+                " QuestionList     VARCHAR(100)  NOT NULL, " +
+                " CreateDate        VARCHAR(20)  DEFAULT NULL, " +
+                " DeadLine        VARCHAR(20)  DEFAULT NULL)";
+
+        Statement stmt = c.createStatement();
+
+        if ( stmt.execute( sql ) ) {
+            System.out.println( "create table homework" );
+        }
+
+        stmt.close();
+    }
+
+    public void initCourseTable () throws SQLException {
         String sql = "CREATE TABLE IF NOT EXISTS COURSE" +
                 " ( CourseId      LONG      PRIMARY KEY   NOT NULL," +
                 " CourseName     VARCHAR(45)  NOT NULL, " +
                 " CourseDesc       VARCHAR(200) DEFAULT NULL, " +
                 " CourseNote       VARCHAR(200)  DEFAULT NULL)";
 
-        Statement stmt = connection.createStatement();
+        Statement stmt = c.createStatement();
 
         if ( stmt.execute( sql ) ) {
             System.out.println( "create table course" );
         }
 
         stmt.close();
+    }
+
+    public void loadInfo () {
+
+        try {
+            ArrayList<User> students = null;
+            ArrayList<User> teachers = null;
+            ArrayList<User> tas = null;
+            ArrayList<Course> courses = null;
+            ArrayList<_Class> classes = null;
+
+
+            students = selectUserAll( "STUDENT" );
+            teachers = selectUserAll( "TEACHER" );
+            tas = selectUserAll( "TA" );
+            courses = selectCourseAll();
+            classes = selectClassAll();
+
+            for ( User stu : students ) {
+                Student student = (Student) stu;
+                ArrayList<_Class> classArrayList = selectUserClassAll( "STUCLASS", student.getId() );
+                student.addClasses( classArrayList );
+                User.addUser( student );
+            }
+            for ( User tea : teachers ) {
+                Teacher teacher = (Teacher) tea;
+                ArrayList<_Class> classArrayList = selectUserClassAll( "TEACLASS", teacher.getId() );
+                teacher.addClasses( classArrayList );
+                User.addUser( teacher );
+            }
+            for ( User ta : tas ) {
+                TA tagg = (TA) ta;
+                ArrayList<_Class> classArrayList = selectUserClassAll( "TACLASS", tagg.getId() );
+                tagg.addClasses( classArrayList );
+                User.addUser( tagg );
+            }
+            for ( Course course : courses ) {
+                Course.addCourse( course );
+            }
+            for ( _Class _class : classes ) {
+                _Class.addClass( _class );
+            }
+        } catch ( SQLException e ) {
+            e.printStackTrace();
+        }
+
+
     }
 
     public void close () throws SQLException {
