@@ -11,6 +11,9 @@ import io.netty.buffer.ByteBuf;
 import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
+import io.netty.handler.codec.http.cookie.Cookie;
+import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
+import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.handler.ssl.SslHandler;
 import io.netty.handler.stream.ChunkedFile;
 import io.netty.util.CharsetUtil;
@@ -54,10 +57,19 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         jsonHandlerHashMap = new HashMap<>();
 
-        jsonHandlerHashMap.put( "/client/json/course/", ( ( channel, request, contents ) -> {
-            System.out.println( "show the id: " + channel.id().asLongText() );
+        jsonHandlerHashMap.put( "/client/json/course/", ( ( request, contents ) -> {
 
-            ArrayList<_Class> arrayList = User.getUser( channel.id().asLongText() ).getClassArrayList();
+            long userId;
+
+            userId = getUserIdFromCookie( request );
+
+            if ( userId == 0 ) {
+                userId = 111;
+
+                System.out.println( "in course change userid" );
+            }
+
+            ArrayList<_Class> arrayList = User.findUser( userId ).getClassArrayList();
 
             JSONObject jsonObject = new JSONObject( true );
             JSONArray classes = new JSONArray();
@@ -65,13 +77,13 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 classes.add( co.getName() );
             }
             jsonObject.put( "courses", classes );
-            System.out.println( "Json: " + jsonObject );
+
             return jsonObject.toJSONString();
         } ) );
 
-        jsonHandlerHashMap.put( "/client/json/questions/", ( ( channel, request, contents ) -> Question.allToJsonObject().toJSONString() ) );
+        jsonHandlerHashMap.put( "/client/json/questions/", ( ( request, contents ) -> Question.allToJsonObject().toJSONString() ) );
 
-        jsonHandlerHashMap.put( "/client/json/homework/generate/", ( channel, request, contents ) -> {
+        jsonHandlerHashMap.put( "/client/json/homework/generate/", ( request, contents ) -> {
 
             Homework homework = new Homework( Homework.geneId(), contents[ 1 ] ); // 1 for hw name
 
@@ -90,8 +102,33 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return homework.toJsonObject().toJSONString();
         } );
 
-        jsonHandlerHashMap.put( "/client/json/homework/list/", ( channel, request, contents ) ->
+        jsonHandlerHashMap.put( "/client/json/homework/list/", ( request, contents ) ->
                 _Class.get_Class( Long.parseLong( contents[ 0 ] ) ).toHomeworkList().toJSONString() );
+
+        jsonHandlerHashMap.put( "/client/html/student/stucourse/json/", ( ( request, contents ) -> {
+
+            long userId = getUserIdFromCookie( request );
+
+            if ( userId == 0 ) {
+                userId = 111;
+
+                System.out.println( "in teacourse change userid" );
+            }
+
+            Teacher teacher = (Teacher) User.findUser( userId );
+
+            long classId = DataBase.selectClassIdByUserAndClassName( teacher.getId(), teacher.getClassPostion(), "TEACLASS" );
+
+            //long classId = DataBase.selectClassIdByUserAndClassName( (long) 111, "Math", "TEACLASS" );
+
+            JSONObject classDesc = new JSONObject( true );
+            classDesc.put( "description", _Class.get_Class( classId ).getDescription() );
+
+            System.out.println( classDesc.toJSONString() );
+
+
+            return classDesc.toJSONString();
+        } ) );
 
     }
 
@@ -158,6 +195,28 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 HttpHeaderNames.LAST_MODIFIED, dateFormatter.format( new Date( fileToCache.lastModified() ) ) );
     }
 
+    private static long getUserIdFromCookie ( FullHttpRequest request ) {
+        long userId = 0;
+        String cookieString = request.headers().get( HttpHeaderNames.COOKIE );
+        if ( cookieString != null ) {
+            Set<io.netty.handler.codec.http.cookie.Cookie> cookies = ServerCookieDecoder.STRICT.decode( cookieString );
+            if ( !cookies.isEmpty() ) {
+                // Reset the cookies if necessary.
+                for ( Cookie cookie : cookies ) {
+                    System.out.println( "Cookie:  " + cookie );
+                    userId = Long.parseLong( cookie.value() );
+                    //response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
+                }
+            } else {
+                System.out.println( "cookie is fycj" );
+            }
+        } else {
+            System.out.println( "cookie is null" );
+        }
+
+        return userId;
+    }
+
     private String[] getPostInfo ( String content ) {
         String[] contents = URLDecoder.decode( content ).split( "&" );
 
@@ -168,23 +227,23 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         return contents;
     }
 
-
     @Override
-    protected void channelRead0 ( ChannelHandlerContext ctx, FullHttpRequest request ) throws Exception {
+    public void channelRead0 ( ChannelHandlerContext ctx, FullHttpRequest request ) throws ParseException, SQLException, IOException {
         this.request = request;
         if ( !request.decoderResult().isSuccess() ) {
             sendError( ctx, BAD_REQUEST );
             return;
         }
+        HttpResponse response = new DefaultHttpResponse( HTTP_1_1, OK );
 
         if ( GET.equals( request.method() ) ) {
-            handleGet( ctx, request );
+            handleGet( ctx, request, response );
         } else if ( POST.equals( request.method() ) ) {
-            handlePost( ctx, request );
+            handlePost( ctx, request, response );
         }
     }
 
-    private void handlePost ( ChannelHandlerContext ctx, FullHttpRequest request ) throws IOException, ParseException, SQLException {
+    private void handlePost ( ChannelHandlerContext ctx, FullHttpRequest request, HttpResponse response ) throws IOException, ParseException, SQLException {
 
         String content = request.content().toString( CharsetUtil.UTF_8 );//.split( "&" );
 
@@ -195,6 +254,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 //        String stuhwList = "/client/json/homework/list/";
 //        String stuhwJudge = "/client/json/homework/summarize/";
 
+
         String uri = request.uri();
         if ( uri.equals( signin ) ) {
             if ( userRegister( getPostInfo( content ) ) == -1 ) {
@@ -202,7 +262,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 return;
             }
         } else if ( uri.equals( stumain ) ) {
-            if ( userLogin( getPostInfo( content ), ctx ) == -1 ) {
+            if ( userLogin( getPostInfo( content ), response, request ) == -1 ) {
                 this.sendRedirect( ctx, signin );
                 return;
             }
@@ -213,15 +273,17 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 //            homeworkList( getPostInfo( content ) );
 //        }
 
-        handleGet( ctx, request );
+        handleGet( ctx, request, response );
     }
 
-    private void handleGet ( ChannelHandlerContext ctx, FullHttpRequest request ) throws ParseException, IOException {
+    private void handleGet ( ChannelHandlerContext ctx, FullHttpRequest request, HttpResponse response ) throws ParseException, IOException, SQLException {
 
         final boolean keepAlive = HttpUtil.isKeepAlive( request );
         final String uri = request.uri();
 
         final String path = sanitizeUri( uri );
+
+        //System.out.println( "path is: " + path );
 
         if ( path == null ) {
             this.sendError( ctx, FORBIDDEN );
@@ -229,6 +291,17 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
 
         if ( CLASS_STR.matcher( uri ).matches() ) {
+            String classTarget = path.substring( path.lastIndexOf( "\\" ) + 1 );
+
+            long userId = getUserIdFromCookie( request );
+            if ( userId == 0 ) {
+                userId = 111;
+                System.out.println( "in matcher change userid" );
+            }
+
+            Teacher tea = (Teacher) User.findUser( userId );
+            tea.setClassPostion( classTarget );
+
             this.sendRedirect( ctx, "/client/html/student/stucourse/index.html" );
         }
 
@@ -278,7 +351,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
         long fileLength = raf.length();
 
-        HttpResponse response = new DefaultHttpResponse( HTTP_1_1, OK );
+        //HttpResponse response = new DefaultHttpResponse( HTTP_1_1, OK );
         HttpUtil.setContentLength( response, fileLength );
         setContentTypeHeader( response, file );
         setDateAndCacheHeaders( response, file );
@@ -341,8 +414,15 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     public void channelUnregistered ( ChannelHandlerContext ctx ) throws Exception {
         super.channelUnregistered( ctx );
         System.out.println( "Channel removed: " + ctx.channel().id() );
-        User.removeBind( ctx.channel().id().asLongText() );
+        User.removeBind( ctx.channel().id() );
         //this.sendRedirect( ctx, "/client/html/signin/index.html" );
+    }
+
+    @Override
+    public void channelRegistered ( ChannelHandlerContext ctx ) throws Exception {
+        super.channelRegistered( ctx );
+        System.out.println( "Channel Registed: " + ctx.channel().id() );
+
     }
 
     private int userRegister ( String[] contents ) throws SQLException {
@@ -375,7 +455,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         return 0;
     }
 
-    private int userLogin ( String[] contents, ChannelHandlerContext ctx ) {
+    private int userLogin ( String[] contents, HttpResponse response, FullHttpRequest request ) {
         String id = contents[ 0 ];
         User user;
         user = User.findUser( Long.parseLong( id ) );
@@ -392,19 +472,43 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return -1;
         }
         user.setActive( true );
-        System.out.println( "Channel bind: " + ctx.channel().id() );
-        User.bindUser( ctx.channel().id().asLongText(), user );
+
+        String cookieString = request.headers().get( HttpHeaderNames.COOKIE );
+        if ( cookieString != null ) {
+            Set<io.netty.handler.codec.http.cookie.Cookie> cookies = ServerCookieDecoder.STRICT.decode( cookieString );
+            if ( !cookies.isEmpty() ) {
+                // Reset the cookies if necessary.
+                Boolean s = false;
+                for ( Cookie cookie : cookies ) {
+                    if ( cookie.name().equals( "userKey" ) ) {
+                        System.out.println( "In login" );
+                        s = true;
+                    }
+                }
+                if ( s ) {
+                    response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( "userKey", user.getId().toString() ) );
+                }
+            }
+        } else {
+            // Browser sent no cookie.  Add some.
+            response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( "userKey", user.getId().toString() ) );
+            //response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( "key2", "value2" ) );
+        }
+//        System.out.println( "Channel bind: " + ctx.channel().id() );
+//
+//        User.bindUser( ctx.channel().id(), user );
+
         return 0;
     }
 
 
-    private void sendJson ( ChannelHandlerContext ctx, String uri, FullHttpRequest request ) {
+    private void sendJson ( ChannelHandlerContext ctx, String uri, FullHttpRequest request ) throws SQLException {
         System.out.println( "check in sendJson: " + uri );
 
         String[] contents = getPostInfo( request.content().toString( CharsetUtil.UTF_8 ) );
 
         if ( jsonHandlerHashMap.containsKey( uri ) ) {
-            String json = jsonHandlerHashMap.get( uri ).jsonHandler( ctx.channel(), request, contents );
+            String json = jsonHandlerHashMap.get( uri ).jsonHandler( request, contents );
             FullHttpResponse response = new DefaultFullHttpResponse( HTTP_1_1, OK );
             response.headers().set( HttpHeaderNames.CONTENT_TYPE, "text/plain; charset=UTF-8" );
             ByteBuf buffer = Unpooled.copiedBuffer( json, CharsetUtil.UTF_8 );
@@ -413,8 +517,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             this.sendAndCleanupConnection( ctx, response );
         }
-
-
     }
 
 

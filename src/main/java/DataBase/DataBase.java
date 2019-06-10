@@ -2,6 +2,7 @@ package DataBase;
 
 import Class._Class;
 import Course.Course;
+import Question.Question;
 import User.Student;
 import User.TA;
 import User.Teacher;
@@ -12,15 +13,17 @@ import java.util.ArrayList;
 
 public class DataBase {
 
-//    static {
-//        try {
-//            Class.forName( "org.sqlite.JDBC" );
-//            connection = DriverManager.getConnection( "jdbc:sqlite:SeProject.db" );
-//        } catch ( Exception e ) {
-//            System.err.println( e.getClass().getName() + ": " + e.getMessage() );
-//            System.exit( 0 );
-//        }
-//
+    private static Connection connection = null;
+
+    static {
+        try {
+            Class.forName( "org.sqlite.JDBC" );
+            connection = DriverManager.getConnection( "jdbc:sqlite:SeProject.db" );
+        } catch ( Exception e ) {
+            System.err.println( e.getClass().getName() + ": " + e.getMessage() );
+            System.exit( 0 );
+        }
+
 //        try {
 //            initUserTable( "STUDENT" );
 //            initUserTable( "TEACHER" );
@@ -34,7 +37,7 @@ public class DataBase {
 //        } catch ( SQLException e ) {
 //            e.printStackTrace();
 //        }
-//    }
+    }
 
     private Connection c = null;
 
@@ -65,6 +68,24 @@ public class DataBase {
 
     }
 
+    public static long selectClassIdByUserAndClassName ( Long UserId, String className, String userType ) throws SQLException {
+        String sql = "SELECT ClassID FROM " + userType + " WHERE UserID = ? AND ClassName = ?";
+        PreparedStatement ps = connection.prepareStatement( sql );
+
+        ps.setLong( 1, UserId );
+        ps.setString( 2, className );
+
+        ResultSet rs = ps.executeQuery();
+
+        long classId = 0;
+
+        while ( rs.next() ) {
+            classId = rs.getLong( "ClassID" );
+        }
+
+        return classId;
+    }
+
     public ArrayList<User> selectUserAll ( String userType ) throws SQLException {
         String sql = "SELECT * FROM " + userType;
 
@@ -73,12 +94,28 @@ public class DataBase {
         ArrayList<User> users = new ArrayList<>();
 
         while ( rs.next() ) {
-            users.add( new Student(
-                    rs.getLong( "UserID" ),
-                    rs.getString( "UserName" ),
-                    rs.getString( "Email" ),
-                    rs.getString( "Password" )
-            ) );
+            if ( userType.equals( "STUDENT" ) ) {
+                users.add( new Student(
+                        rs.getLong( "UserID" ),
+                        rs.getString( "UserName" ),
+                        rs.getString( "Email" ),
+                        rs.getString( "Password" )
+                ) );
+            } else if ( userType.equals( "TEACHER" ) ) {
+                users.add( new Teacher(
+                        rs.getLong( "UserID" ),
+                        rs.getString( "UserName" ),
+                        rs.getString( "Email" ),
+                        rs.getString( "Password" )
+                ) );
+            } else if ( userType.equals( "TA" ) ) {
+                users.add( new TA(
+                        rs.getLong( "UserID" ),
+                        rs.getString( "UserName" ),
+                        rs.getString( "Email" ),
+                        rs.getString( "Password" )
+                ) );
+            }
         }
 
         stmt.close();
@@ -129,6 +166,36 @@ public class DataBase {
         stmt.close();
         rs.close();
         return courses;
+    }
+
+    public ArrayList<Question> selectQuestionAll () throws SQLException {
+        String sql = "SELECT * FROM QUESTION";
+
+        Statement stmt = c.createStatement();
+        ResultSet rs = stmt.executeQuery( sql );
+        ArrayList<Question> questions = new ArrayList<>();
+
+        while ( rs.next() ) {
+
+            String[] choices = new String[ 4 ];
+            choices[ 0 ] = rs.getString( "ChoiceA" );
+            choices[ 1 ] = rs.getString( "ChoiceB" );
+            choices[ 2 ] = rs.getString( "ChoiceC" );
+            choices[ 3 ] = rs.getString( "ChoiceD" );
+
+            questions.add( new Question(
+                    rs.getLong( "QuestionId" ),
+                    rs.getString( "Content" ),
+                    rs.getString( "TYPE" ),
+                    rs.getInt( "MARK" ),
+                    rs.getString( "Answer" ),
+                    choices
+            ) );
+        }
+
+        stmt.close();
+        rs.close();
+        return questions;
     }
 
     public ArrayList<_Class> selectClassAll () throws SQLException {
@@ -188,7 +255,8 @@ public class DataBase {
                 " ( QuestionId      LONG      PRIMARY KEY   NOT NULL," +
                 " Content     VARCHAR(100)  NOT NULL, " +
                 " Answer        CHAR(5)     NOT NULL, " +
-                " TYEP          CHAR(10)    NOT NULL," +
+                " TYPE          CHAR(10)    NOT NULL," +
+                " MARK          INT         NOT NULL," +
                 " ChoiceA        VARCHAR(50)  NOT NULL," +
                 " ChoiceB        VARCHAR(50)  NOT NULL," +
                 " ChoiceC        VARCHAR(50)  NOT NULL," +
@@ -253,18 +321,12 @@ public class DataBase {
     public void loadInfo () {
 
         try {
-            ArrayList<User> students = null;
-            ArrayList<User> teachers = null;
-            ArrayList<User> tas = null;
-            ArrayList<Course> courses = null;
-            ArrayList<_Class> classes = null;
-
-
-            students = selectUserAll( "STUDENT" );
-            teachers = selectUserAll( "TEACHER" );
-            tas = selectUserAll( "TA" );
-            courses = selectCourseAll();
-            classes = selectClassAll();
+            ArrayList<User> students = selectUserAll( "STUDENT" );
+            ArrayList<User> teachers = selectUserAll( "TEACHER" );
+            ArrayList<User> tas = selectUserAll( "TA" );
+            ArrayList<Course> courses = selectCourseAll();
+            ArrayList<_Class> classes = selectClassAll();
+            ArrayList<Question> questions = selectQuestionAll();
 
             for ( User stu : students ) {
                 Student student = (Student) stu;
@@ -290,6 +352,14 @@ public class DataBase {
             for ( _Class _class : classes ) {
                 _Class.addClass( _class );
             }
+
+            for ( Question ques : questions
+            ) {
+                Question.addQuestion( ques );
+            }
+
+            //c.close();
+
         } catch ( SQLException e ) {
             e.printStackTrace();
         }

@@ -7,22 +7,26 @@ import java.util.concurrent.ConcurrentHashMap;
 
 public class Question {
 
-    private static ConcurrentHashMap<Integer, Question> allQuestions;
+    private static ConcurrentHashMap<Long, Question> allQuestions;
 
     static {
         allQuestions = new ConcurrentHashMap<>();
     }
 
-    private int id;
+    private Long id;
     private int mark;
     private String content;
     private String answer;
     private String type;
     private String[] choices;
 
-    public Question ( int id, String type ) {
+    public Question ( Long id, String content, String type, int mark, String answer, String[] choices ) {
         this.id = id;
         this.type = type;
+        this.content = content;
+        this.answer = answer;
+        this.choices = choices;
+        this.mark = mark;
     }
 
     public static void addQuestion ( Question question ) {
@@ -30,20 +34,44 @@ public class Question {
     }
 
 
-    public static ConcurrentHashMap<Integer, Question> getAllQuestions () {
+    public static ConcurrentHashMap<Long, Question> getAllQuestions () {
         return allQuestions;
     }
 
     public static JSONObject allToJsonObject () {
         JSONObject jsonObject = new JSONObject( true );
-        JSONArray jsonArray = new JSONArray();
 
-        for ( int key : allQuestions.keySet()
+        JSONObject choice = new JSONObject( true );
+        JSONObject judge = new JSONObject( true );
+
+        int numberChoice = 0;
+        int numberJudge = 0;
+
+        JSONArray choices = new JSONArray();
+
+        JSONArray judges = new JSONArray();
+
+        for ( Long key : allQuestions.keySet()
         ) {
-            jsonArray.add( allQuestions.get( key ).toJsonObject() );
-        }
+            Question question = allQuestions.get( key );
+            if ( question.getType().equals( "choice" ) ) {
+                numberChoice++;
+                choices.add( question.toJsonObject() );
 
-        jsonObject.put( "questions", jsonArray );
+            } else {
+                numberJudge++;
+                judges.add( question.toJsonObject() );
+            }
+        }
+        choice.put( "number", numberChoice );
+        choice.put( "problems", choices );
+
+        judge.put( "number", numberJudge );
+        judge.put( "problems", judges );
+
+
+        jsonObject.put( "choice", choice );
+        jsonObject.put( "judge", judge );
         return jsonObject;
     }
 
@@ -62,11 +90,15 @@ public class Question {
         this.mark = mark;
     }
 
+    public String getType () {
+        return this.type;
+    }
+
     public void setChoices ( String[] cs ) {
         this.choices = cs;
     }
 
-    public int getId () {
+    public Long getId () {
         return id;
     }
 
@@ -89,8 +121,7 @@ public class Question {
     public JSONObject toJsonObject () {
         JSONObject question = new JSONObject( true );
         question.put( "content", content );
-        question.put( "type", type );
-        if ( type.equals( "choice" ) ) {
+        if ( this.type.equals( "choice" ) ) {
             question.put( "choiceA", choices[ 0 ] );
             question.put( "choiceB", choices[ 1 ] );
             question.put( "choiceC", choices[ 2 ] );
