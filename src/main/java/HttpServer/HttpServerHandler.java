@@ -12,6 +12,7 @@ import io.netty.buffer.Unpooled;
 import io.netty.channel.*;
 import io.netty.handler.codec.http.*;
 import io.netty.handler.codec.http.cookie.Cookie;
+import io.netty.handler.codec.http.cookie.DefaultCookie;
 import io.netty.handler.codec.http.cookie.ServerCookieDecoder;
 import io.netty.handler.codec.http.cookie.ServerCookieEncoder;
 import io.netty.handler.ssl.SslHandler;
@@ -45,7 +46,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private static final Pattern TEACHER_ID = Pattern.compile( "^[1][0-9]*$" );
     private static final Pattern TA_ID = Pattern.compile( "^[2][0-9]*$" );
     private static final Pattern ADMIN_ID = Pattern.compile( "^[0][0-9]*$" );
-    private static final Pattern CLASS_STR = Pattern.compile( "^/client/class/.*" );
+    private static final Pattern EQUAL_STR = Pattern.compile( "^.*\\?.*" );
+    private static final Pattern CLASS_STR = Pattern.compile( "^.*\\?class=.*" );
     private static HashMap<String, JsonHandler> jsonHandlerHashMap;
     private static DataBase db;
     private static Administrator admin;
@@ -62,12 +64,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             long userId;
 
             userId = getUserIdFromCookie( request );
-
-            if ( userId == 0 ) {
-                userId = 111;
-
-                System.out.println( "in course change userid" );
-            }
 
             ArrayList<_Class> arrayList = User.findUser( userId ).getClassArrayList();
 
@@ -109,17 +105,9 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             long userId = getUserIdFromCookie( request );
 
-            if ( userId == 0 ) {
-                userId = 111;
-
-                System.out.println( "in teacourse change userid" );
-            }
-
             Teacher teacher = (Teacher) User.findUser( userId );
 
             long classId = DataBase.selectClassIdByUserAndClassName( teacher.getId(), teacher.getClassPostion(), "TEACLASS" );
-
-            //long classId = DataBase.selectClassIdByUserAndClassName( (long) 111, "Math", "TEACLASS" );
 
             JSONObject classDesc = new JSONObject( true );
             classDesc.put( "description", _Class.get_Class( classId ).getDescription() );
@@ -267,11 +255,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 return;
             }
         }
-//        else if ( uri.equals( stuhw ) ) {
-//            homeworkGenerate( getPostInfo( content ) );
-//        } else if ( uri.equals( stuhwList ) ) {
-//            homeworkList( getPostInfo( content ) );
-//        }
 
         handleGet( ctx, request, response );
     }
@@ -281,28 +264,27 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         final boolean keepAlive = HttpUtil.isKeepAlive( request );
         final String uri = request.uri();
 
-        final String path = sanitizeUri( uri );
+        String path = sanitizeUri( uri );
+        String classTarget;
 
-        //System.out.println( "path is: " + path );
-
-        if ( path == null ) {
-            this.sendError( ctx, FORBIDDEN );
-            return;
-        }
-
-        if ( CLASS_STR.matcher( uri ).matches() ) {
-            String classTarget = path.substring( path.lastIndexOf( "\\" ) + 1 );
+        if ( CLASS_STR.matcher( path ).matches() ) {
+            classTarget = path.substring( path.lastIndexOf( "=" ) + 1 );
 
             long userId = getUserIdFromCookie( request );
-            if ( userId == 0 ) {
-                userId = 111;
-                System.out.println( "in matcher change userid" );
-            }
 
             Teacher tea = (Teacher) User.findUser( userId );
             tea.setClassPostion( classTarget );
 
-            this.sendRedirect( ctx, "/client/html/student/stucourse/index.html" );
+            path = path.substring( 0, path.lastIndexOf( "?" ) );
+        } else if ( EQUAL_STR.matcher( path ).matches() ) {
+            path = path.substring( 0, path.lastIndexOf( "?" ) );
+        }
+
+        //System.out.println( path + " cookie: " + request.headers().get( HttpHeaderNames.COOKIE ) );
+
+        if ( path == null ) {
+            this.sendError( ctx, FORBIDDEN );
+            return;
         }
 
         File file = new File( path );
@@ -410,21 +392,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         }
     }
 
-    @Override
-    public void channelUnregistered ( ChannelHandlerContext ctx ) throws Exception {
-        super.channelUnregistered( ctx );
-        System.out.println( "Channel removed: " + ctx.channel().id() );
-        User.removeBind( ctx.channel().id() );
-        //this.sendRedirect( ctx, "/client/html/signin/index.html" );
-    }
-
-    @Override
-    public void channelRegistered ( ChannelHandlerContext ctx ) throws Exception {
-        super.channelRegistered( ctx );
-        System.out.println( "Channel Registed: " + ctx.channel().id() );
-
-    }
-
     private int userRegister ( String[] contents ) throws SQLException {
         // TO DO judge the type of user
         String id = contents[ 0 ];
@@ -475,29 +442,27 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         String cookieString = request.headers().get( HttpHeaderNames.COOKIE );
         if ( cookieString != null ) {
-            Set<io.netty.handler.codec.http.cookie.Cookie> cookies = ServerCookieDecoder.STRICT.decode( cookieString );
+            Set<Cookie> cookies = ServerCookieDecoder.STRICT.decode( cookieString );
             if ( !cookies.isEmpty() ) {
                 // Reset the cookies if necessary.
                 Boolean s = false;
                 for ( Cookie cookie : cookies ) {
                     if ( cookie.name().equals( "userKey" ) ) {
                         System.out.println( "In login" );
-                        s = true;
+                        cookie.setPath( "/" );
+                        cookie.setDomain( "localhost" );
+                        response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
                     }
-                }
-                if ( s ) {
-                    response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( "userKey", user.getId().toString() ) );
                 }
             }
         } else {
             // Browser sent no cookie.  Add some.
-            response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( "userKey", user.getId().toString() ) );
+            Cookie cookie = new DefaultCookie( "userKey", user.getId().toString() );
+            cookie.setPath( "/" );
+            cookie.setDomain( "localhost" );
+            response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
             //response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( "key2", "value2" ) );
         }
-//        System.out.println( "Channel bind: " + ctx.channel().id() );
-//
-//        User.bindUser( ctx.channel().id(), user );
-
         return 0;
     }
 
