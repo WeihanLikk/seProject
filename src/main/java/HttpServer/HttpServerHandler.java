@@ -101,13 +101,23 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         jsonHandlerHashMap.put( "/client/json/homework/list/", ( request, contents ) ->
                 _Class.get_Class( Long.parseLong( contents[ 0 ] ) ).toHomeworkList().toJSONString() );
 
-        jsonHandlerHashMap.put( "/client/html/student/stucourse/json/", ( ( request, contents ) -> {
+        jsonHandlerHashMap.put( "/client/json/courseDesc/", ( ( request, contents ) -> {
 
             long userId = getUserIdFromCookie( request );
 
-            Teacher teacher = (Teacher) User.findUser( userId );
+            User user = User.findUser( userId );
 
-            long classId = DataBase.selectClassIdByUserAndClassName( teacher.getId(), teacher.getClassPostion(), "TEACLASS" );
+            String tableType = "";
+            if ( STUDENT_ID.matcher( String.valueOf( userId ) ).matches() ) {
+                tableType = "STUCLASS";
+            } else if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
+                tableType = "TEACLASS";
+            } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
+                tableType = "TACLASS";
+            }
+
+
+            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), tableType );
 
             JSONObject classDesc = new JSONObject( true );
             classDesc.put( "description", _Class.get_Class( classId ).getDescription() );
@@ -191,7 +201,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             if ( !cookies.isEmpty() ) {
                 // Reset the cookies if necessary.
                 for ( Cookie cookie : cookies ) {
-                    System.out.println( "Cookie:  " + cookie );
+                    //System.out.println( "Cookie:  " + cookie );
                     userId = Long.parseLong( cookie.value() );
                     //response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
                 }
@@ -272,8 +282,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             long userId = getUserIdFromCookie( request );
 
-            Teacher tea = (Teacher) User.findUser( userId );
-            tea.setClassPostion( classTarget );
+            User tea = User.findUser( userId );
+            tea.setClassPosition( classTarget );
 
             path = path.substring( 0, path.lastIndexOf( "?" ) );
         } else if ( EQUAL_STR.matcher( path ).matches() ) {

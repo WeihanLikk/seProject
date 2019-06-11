@@ -15,6 +15,7 @@ public class User {
         channelUserConcurrentHashMap = new ConcurrentHashMap<>();
     }
 
+    private String classPostion;
     private ArrayList<_Class> classArrayList;
     private long id;
     private String name;
@@ -52,6 +53,13 @@ public class User {
         return channelUserConcurrentHashMap.getOrDefault( channel, null );
     }
 
+    public String getClassPosition () {
+        return classPostion;
+    }
+
+    public void setClassPosition ( String postion ) {
+        this.classPostion = postion;
+    }
 
     public void addClasses ( ArrayList<_Class> classes ) {
         classArrayList = classes;
