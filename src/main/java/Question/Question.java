@@ -33,6 +33,16 @@ public class Question {
         allQuestions.put( question.getId(), question );
     }
 
+    public static String getFuckID () {
+        String s = "";
+        for ( long id : allQuestions.keySet()
+        ) {
+            s += " " + id;
+        }
+
+        return s;
+    }
+
 
     public static ConcurrentHashMap<Long, Question> getAllQuestions () {
         return allQuestions;
@@ -75,7 +85,7 @@ public class Question {
         return jsonObject;
     }
 
-    public static Question getQuestion ( int id ) {
+    public static Question getQuestion ( long id ) {
         if ( allQuestions.containsKey( id ) ) {
             return allQuestions.get( id );
         }

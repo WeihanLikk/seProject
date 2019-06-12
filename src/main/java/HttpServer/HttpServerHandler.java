@@ -80,16 +80,36 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         jsonHandlerHashMap.put( "/client/json/homework/generate/", ( request, contents ) -> {
 
-            Homework homework = new Homework( Homework.geneId(), contents[ 1 ] ); // 1 for hw name
+            Homework homework = new Homework( Homework.geneId(), "test name" ); // 1 for hw name
 
-            for ( int i = 2; i < contents.length; i++ ) {
-                Question question = Question.getQuestion( Integer.parseInt( contents[ i ] ) );
+            for ( int i = 0; i < contents.length; i++ ) {
+
+                //System.out.println( "fuck check: "+Question.getFuckID() );
+
+                Question question = Question.getQuestion( Long.parseLong( contents[ i ] ) );
                 if ( question != null ) {
                     homework.addQuestion( question );
+                } else {
+                    System.out.println( "Question id: " + contents[ i ] + " not exist!" );
                 }
             }
 
-            _Class.get_Class( Long.parseLong( contents[ 0 ] ) ).addHomeWork( homework ); // 0 for class id
+            long userId = getUserIdFromCookie( request );
+            User user = User.findUser( userId );
+            String tableType = "fuck";
+            if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
+                tableType = "TEACLASS";
+            } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
+                tableType = "TACLASS";
+            }
+
+            //System.out.println( user.getId() + " " + user.getClassPosition() + " " + tableType );
+
+            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), tableType );
+
+            //System.out.println( "Classid: " + classId );
+
+            _Class.get_Class( classId ).addHomeWork( homework ); // 0 for class id
 
             homework.setTotalMarks();
             Homework.addHomework( homework );
@@ -200,7 +220,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             if ( !cookies.isEmpty() ) {
                 // Reset the cookies if necessary.
                 for ( Cookie cookie : cookies ) {
-                    //System.out.println( "Cookie:  " + cookie );
+                    System.out.println( "Cookie:  " + cookie );
                     userId = Long.parseLong( cookie.value() );
                     //response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
                 }
@@ -247,6 +267,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         String signin = "/client/html/signin/index.html";
         String signup = "/client/html/signup/index.html";
         String stumain = "/client/html/student/stumain/index.html";
+        String teamain = "/client/html/teacher/teamain/index.html";
+        //String tamain = "/client/html/teacher/teamain/index.html";
 //        String stuhw = "/client/json/homework/generate/";
 //        String stuhwList = "/client/json/homework/list/";
 //        String stuhwJudge = "/client/json/homework/summarize/";
@@ -258,7 +280,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 this.sendRedirect( ctx, signup );
                 return;
             }
-        } else if ( uri.equals( stumain ) ) {
+        } else if ( uri.equals( stumain ) || uri.equals( teamain ) ) {
             if ( userLogin( getPostInfo( content ), response, request ) == -1 ) {
                 this.sendRedirect( ctx, signin );
                 return;
@@ -289,7 +311,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             path = path.substring( 0, path.lastIndexOf( "?" ) );
         }
 
-        //System.out.println( path + " cookie: " + request.headers().get( HttpHeaderNames.COOKIE ) );
+        //System.out.println( path );
 
         if ( path == null ) {
             this.sendError( ctx, FORBIDDEN );
@@ -460,6 +482,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         System.out.println( "In login" );
                         cookie.setPath( "/" );
                         cookie.setDomain( "localhost" );
+                        System.out.println( "fuck value: " + user.getId() );
                         cookie.setValue( user.getId().toString() );
                         //response.headers().remove( HttpHeaderNames.COOKIE );
                         response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
@@ -469,6 +492,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         } else {
             // Browser sent no cookie.  Add some.
             Cookie cookie = new DefaultCookie( "userKey", user.getId().toString() );
+            System.out.println( "fuck value 2: " + user.getId() );
             cookie.setPath( "/" );
             cookie.setDomain( "localhost" );
             response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
