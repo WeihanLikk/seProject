@@ -68,6 +68,53 @@ public class DataBase {
 
     }
 
+    public static void loadInfo () {
+
+        try {
+            ArrayList<User> students = selectUserAll( "STUDENT" );
+            ArrayList<User> teachers = selectUserAll( "TEACHER" );
+            ArrayList<User> tas = selectUserAll( "TA" );
+            ArrayList<Course> courses = selectCourseAll();
+            ArrayList<_Class> classes = selectClassAll();
+            ArrayList<Question> questions = selectQuestionAll();
+
+            for ( User stu : students ) {
+                Student student = (Student) stu;
+                ArrayList<_Class> classArrayList = selectUserClassAll( "STUCLASS", student.getId() );
+                student.addClasses( classArrayList );
+                User.addUser( student );
+            }
+            for ( User tea : teachers ) {
+                Teacher teacher = (Teacher) tea;
+                ArrayList<_Class> classArrayList = selectUserClassAll( "TEACLASS", teacher.getId() );
+                teacher.addClasses( classArrayList );
+                User.addUser( teacher );
+            }
+            for ( User ta : tas ) {
+                TA tagg = (TA) ta;
+                ArrayList<_Class> classArrayList = selectUserClassAll( "TACLASS", tagg.getId() );
+                tagg.addClasses( classArrayList );
+                User.addUser( tagg );
+            }
+            for ( Course course : courses ) {
+                Course.addCourse( course );
+            }
+            for ( _Class _class : classes ) {
+                _Class.addClass( _class );
+            }
+
+            for ( Question ques : questions
+            ) {
+                Question.addQuestion( ques );
+            }
+
+            //connection.close();
+
+        } catch ( SQLException e ) {
+            e.printStackTrace();
+        }
+    }
+
     public static long selectClassIdByUserAndClassName ( Long UserId, String className, String userType ) throws SQLException {
         String sql = "SELECT ClassID FROM " + userType + " WHERE UserID = ? AND ClassName = ?";
         PreparedStatement ps = connection.prepareStatement( sql );
@@ -86,10 +133,10 @@ public class DataBase {
         return classId;
     }
 
-    public ArrayList<User> selectUserAll ( String userType ) throws SQLException {
+    public static ArrayList<User> selectUserAll ( String userType ) throws SQLException {
         String sql = "SELECT * FROM " + userType;
 
-        Statement stmt = c.createStatement();
+        Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery( sql );
         ArrayList<User> users = new ArrayList<>();
 
@@ -123,10 +170,10 @@ public class DataBase {
         return users;
     }
 
-    public ArrayList<_Class> selectUserClassAll ( String name, long id ) throws SQLException {
+    public static ArrayList<_Class> selectUserClassAll ( String name, long id ) throws SQLException {
         String sql = "SELECT * FROM " + name + " WHERE UserID = ?";
 
-        PreparedStatement ps = c.prepareStatement( sql );
+        PreparedStatement ps = connection.prepareStatement( sql );
 
         ps.setLong( 1, id );
 
@@ -147,10 +194,10 @@ public class DataBase {
         return classes;
     }
 
-    public ArrayList<Course> selectCourseAll () throws SQLException {
+    public static ArrayList<Course> selectCourseAll () throws SQLException {
         String sql = "SELECT * FROM COURSE";
 
-        Statement stmt = c.createStatement();
+        Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery( sql );
         ArrayList<Course> courses = new ArrayList<>();
 
@@ -168,10 +215,10 @@ public class DataBase {
         return courses;
     }
 
-    public ArrayList<Question> selectQuestionAll () throws SQLException {
+    public static ArrayList<Question> selectQuestionAll () throws SQLException {
         String sql = "SELECT * FROM QUESTION";
 
-        Statement stmt = c.createStatement();
+        Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery( sql );
         ArrayList<Question> questions = new ArrayList<>();
 
@@ -198,10 +245,10 @@ public class DataBase {
         return questions;
     }
 
-    public ArrayList<_Class> selectClassAll () throws SQLException {
+    public static ArrayList<_Class> selectClassAll () throws SQLException {
         String sql = "SELECT * FROM CLASS";
 
-        Statement stmt = c.createStatement();
+        Statement stmt = connection.createStatement();
         ResultSet rs = stmt.executeQuery( sql );
         ArrayList<_Class> classes = new ArrayList<>();
 
@@ -318,57 +365,9 @@ public class DataBase {
         stmt.close();
     }
 
-    public void loadInfo () {
-
-        try {
-            ArrayList<User> students = selectUserAll( "STUDENT" );
-            ArrayList<User> teachers = selectUserAll( "TEACHER" );
-            ArrayList<User> tas = selectUserAll( "TA" );
-            ArrayList<Course> courses = selectCourseAll();
-            ArrayList<_Class> classes = selectClassAll();
-            ArrayList<Question> questions = selectQuestionAll();
-
-            for ( User stu : students ) {
-                Student student = (Student) stu;
-                ArrayList<_Class> classArrayList = selectUserClassAll( "STUCLASS", student.getId() );
-                student.addClasses( classArrayList );
-                User.addUser( student );
-            }
-            for ( User tea : teachers ) {
-                Teacher teacher = (Teacher) tea;
-                ArrayList<_Class> classArrayList = selectUserClassAll( "TEACLASS", teacher.getId() );
-                teacher.addClasses( classArrayList );
-                User.addUser( teacher );
-            }
-            for ( User ta : tas ) {
-                TA tagg = (TA) ta;
-                ArrayList<_Class> classArrayList = selectUserClassAll( "TACLASS", tagg.getId() );
-                tagg.addClasses( classArrayList );
-                User.addUser( tagg );
-            }
-            for ( Course course : courses ) {
-                Course.addCourse( course );
-            }
-            for ( _Class _class : classes ) {
-                _Class.addClass( _class );
-            }
-
-            for ( Question ques : questions
-            ) {
-                Question.addQuestion( ques );
-            }
-
-            //c.close();
-
-        } catch ( SQLException e ) {
-            e.printStackTrace();
-        }
-
-
-    }
-
     public void close () throws SQLException {
         c.close();
+        connection.close();
     }
 
     public int insertUserInfo ( User user ) throws SQLException {
@@ -392,6 +391,49 @@ public class DataBase {
 
         return 0;
     }
+
+    public int insertClassInfo ( _Class _class ) throws SQLException {
+        ArrayList<_Class> classes = selectClassInfoByID( _class.getId() );
+        if ( classes.size() != 0 ) {
+            return -1;
+        }
+
+        String sql = "INSERT INTO CLASS (ClassID, ClassName, ClassDesc)VALUES(?,?,?)";
+        PreparedStatement ps = c.prepareStatement( sql );
+        ps.setLong( 1, _class.getId() );
+        ps.setString( 2, _class.getName() );
+        ps.setString( 3, _class.getDescription() );
+
+        int count = ps.executeUpdate();
+        System.out.println( "Insert into table CLASS " + count + " records" );
+
+        ps.close();
+
+        return 0;
+    }
+
+    public ArrayList<_Class> selectClassInfoByID ( long id ) throws SQLException {
+        String sql = "SELECT * FROM CLASS WHERE ClassID = ?";
+        PreparedStatement ps = c.prepareStatement( sql );
+
+        ps.setLong( 1, id );
+        ResultSet rs = ps.executeQuery();
+
+        ArrayList<_Class> classes = new ArrayList<>();
+
+        while ( rs.next() ) {
+            classes.add( new _Class(
+                    rs.getLong( "ClassID" ),
+                    rs.getString( "ClassName" ),
+                    rs.getString( "ClassDesc" )
+            ) );
+        }
+
+        ps.close();
+        rs.close();
+        return classes;
+    }
+
 
     public ArrayList<User> selectUserInfoByID ( long id, String userType ) throws SQLException {
         String sql = "SELECT * FROM " + userType + " WHERE UserID = ?";

@@ -1,18 +1,15 @@
 package User;
 
 import Class._Class;
-import io.netty.channel.ChannelId;
 
 import java.util.ArrayList;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class User {
     private static ConcurrentHashMap<Long, User> userHashMap;
-    private static ConcurrentHashMap<ChannelId, User> channelUserConcurrentHashMap;
 
     static {
         userHashMap = new ConcurrentHashMap<Long, User>();
-        channelUserConcurrentHashMap = new ConcurrentHashMap<>();
     }
 
     private String classPostion;
@@ -36,21 +33,6 @@ public class User {
 
     public static void addUser ( User user ) {
         userHashMap.put( user.getId(), user );
-    }
-
-    public static void bindUser ( ChannelId id, User user ) {
-        if ( channelUserConcurrentHashMap.containsKey( id ) ) {
-            channelUserConcurrentHashMap.remove( id );
-        }
-        channelUserConcurrentHashMap.put( id, user );
-    }
-
-    public static void removeBind ( ChannelId channel ) {
-        channelUserConcurrentHashMap.remove( channel );
-    }
-
-    public static User getUser ( ChannelId channel ) {
-        return channelUserConcurrentHashMap.getOrDefault( channel, null );
     }
 
     public String getClassPosition () {

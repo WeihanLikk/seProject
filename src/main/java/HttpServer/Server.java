@@ -1,5 +1,6 @@
 package HttpServer;
 
+import DataBase.DataBase;
 import io.netty.bootstrap.ServerBootstrap;
 import io.netty.channel.Channel;
 import io.netty.channel.EventLoopGroup;
@@ -28,6 +29,8 @@ public class Server {
         } else {
             sslCtx = null;
         }
+
+        DataBase.loadInfo();
 
         EventLoopGroup bossGroup = new NioEventLoopGroup();
         EventLoopGroup workerGroup = new NioEventLoopGroup();

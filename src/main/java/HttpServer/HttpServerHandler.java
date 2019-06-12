@@ -54,7 +54,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
     static {
         db = new DataBase();
-        db.loadInfo();
         admin = new Administrator( (long) 1000, "admin", null, "admin" );
 
         jsonHandlerHashMap = new HashMap<>();
@@ -461,6 +460,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                         System.out.println( "In login" );
                         cookie.setPath( "/" );
                         cookie.setDomain( "localhost" );
+                        cookie.setValue( user.getId().toString() );
+                        //response.headers().remove( HttpHeaderNames.COOKIE );
                         response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
                     }
                 }

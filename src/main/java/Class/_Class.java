@@ -39,6 +39,18 @@ public class _Class {
         return null;
     }
 
+//    public static ArrayList<_Class> getClassList () {
+//
+//        ArrayList<_Class> classes = new ArrayList<>();
+//
+//        for ( Long key : classMap.keySet()
+//        ) {
+//            classes.add( classMap.get( key ) );
+//        }
+//
+//        return classes;
+//    }
+
     public void addHomeWork ( Homework homework ) {
         homeworkList.add( homework );
     }
