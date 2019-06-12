@@ -4,10 +4,11 @@ import io.netty.channel.ChannelInitializer;
 import io.netty.channel.ChannelPipeline;
 import io.netty.channel.socket.SocketChannel;
 import io.netty.handler.codec.http.HttpObjectAggregator;
-import io.netty.handler.codec.http.HttpResponseEncoder;
 import io.netty.handler.codec.http.HttpServerCodec;
 import io.netty.handler.ssl.SslContext;
 import io.netty.handler.stream.ChunkedWriteHandler;
+import io.netty.util.concurrent.DefaultEventExecutorGroup;
+import io.netty.util.concurrent.EventExecutorGroup;
 
 public class serverInitializer extends ChannelInitializer<SocketChannel> {
 
@@ -26,10 +27,11 @@ public class serverInitializer extends ChannelInitializer<SocketChannel> {
         }
 
         pipeline.addLast( "httpServerCodec", new HttpServerCodec() );
-        //pipeline.addLast( new HttpResponseEncoder() );
+        pipeline.addLast( new HttpUploadHandler() );
+
         pipeline.addLast( new HttpObjectAggregator( 65536 ) );
         pipeline.addLast( new ChunkedWriteHandler() );
-        //pipeline.addLast( new HttpServerExpectContinueHandler() );
         pipeline.addLast( "testHttpServerHandler", new HttpServerHandler() );
+
     }
 }
