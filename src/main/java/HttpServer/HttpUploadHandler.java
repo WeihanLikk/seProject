@@ -16,7 +16,7 @@ public class HttpUploadHandler extends SimpleChannelInboundHandler<HttpObject> {
 
 
     private static final HttpDataFactory factory = new DefaultHttpDataFactory( true );
-    private static final String FILE_UPLOAD = "/client/resources/";
+    private static final String FILE_UPLOAD = "/client/resources/files/";
     private static final String URI = "/upload";
     HttpRequest request;
     private HttpPostRequestDecoder httpDecoder;

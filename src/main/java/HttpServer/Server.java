@@ -18,7 +18,7 @@ import java.sql.SQLException;
 public class Server {
 
     static final boolean SSL = System.getProperty( "ssl" ) != null;
-    static final int PORT = Integer.parseInt( System.getProperty( "port", SSL ? "8443" : "8080" ) );
+    static final int PORT = Integer.parseInt( System.getProperty( "port", SSL ? "8443" : "8888" ) );
 
     public static void main ( String[] args ) throws InterruptedException, CertificateException, SSLException, SQLException {
         final SslContext sslCtx;

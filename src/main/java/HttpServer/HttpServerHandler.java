@@ -2,6 +2,7 @@ package HttpServer;
 
 import Class._Class;
 import DataBase.DataBase;
+import FileManger.FileManger;
 import Homework.Homework;
 import Question.Question;
 import User.*;
@@ -146,6 +147,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             return classDesc.toJSONString();
         } ) );
+
+        jsonHandlerHashMap.put( "/client/resources/files/", ( ( request1, contents ) -> FileManger.toJsonList().toJSONString() ) );
 
     }
 
