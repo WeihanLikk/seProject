@@ -13,6 +13,7 @@ public class User {
     }
 
     private String classPostion;
+    private long hwGetTarget;
     private ArrayList<_Class> classArrayList;
     private long id;
     private String name;
@@ -41,6 +42,14 @@ public class User {
 
     public void setClassPosition ( String postion ) {
         this.classPostion = postion;
+    }
+
+    public long getHwGetTarget () {
+        return hwGetTarget;
+    }
+
+    public void setHwGetTarget ( long id ) {
+        this.hwGetTarget = id;
     }
 
     public void addClasses ( ArrayList<_Class> classes ) {

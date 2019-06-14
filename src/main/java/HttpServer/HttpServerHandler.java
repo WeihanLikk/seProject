@@ -49,6 +49,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
     private static final Pattern ADMIN_ID = Pattern.compile( "^[0][0-9]*$" );
     private static final Pattern EQUAL_STR = Pattern.compile( "^.*\\?.*" );
     private static final Pattern CLASS_STR = Pattern.compile( "^.*\\?class=.*" );
+    private static final Pattern HK_STR = Pattern.compile( "^.*\\?homeworkid=.*" );
     private static HashMap<String, JsonHandler> jsonHandlerHashMap;
     private static DataBase db;
     private static Administrator admin;
@@ -80,12 +81,12 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         jsonHandlerHashMap.put( "/client/json/questions/", ( ( request, contents ) -> Question.allToJsonObject().toJSONString() ) );
 
         jsonHandlerHashMap.put( "/client/json/homework/generate/", ( request, contents ) -> {
+            Homework homework = new Homework( Homework.geneId(), contents[ contents.length - 1 ] ); // 1 for hw name
 
-            Homework homework = new Homework( Homework.geneId(), "test name" ); // 1 for hw name
+            //System.out.println( contents[ contents.length - 1 ] );
 
-            for ( int i = 0; i < contents.length; i++ ) {
-
-                //System.out.println( "fuck check: "+Question.getFuckID() );
+            for ( int i = 0; i < contents.length - 1; i++ ) {
+                //System.out.println( "fuck check: "+Question.getFuckID() )
 
                 Question question = Question.getQuestion( Long.parseLong( contents[ i ] ) );
                 if ( question != null ) {
@@ -118,8 +119,35 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             return homework.toJsonObject().toJSONString();
         } );
 
-        jsonHandlerHashMap.put( "/client/json/homework/list/", ( request, contents ) ->
-                _Class.get_Class( Long.parseLong( contents[ 0 ] ) ).toHomeworkList().toJSONString() );
+        jsonHandlerHashMap.put( "/client/json/homework/list/", ( request, contents ) -> {
+            long userId = getUserIdFromCookie( request );
+            User user = User.findUser( userId );
+            String tableType = "fuck";
+            if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
+                tableType = "TEACLASS";
+            } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
+                tableType = "TACLASS";
+            } else if ( STUDENT_ID.matcher( String.valueOf( userId ) ).matches() ) {
+                tableType = "STUCLASS";
+            }
+
+            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), tableType );
+
+            return _Class.get_Class( classId ).toHomeworkList().toJSONString();
+        } );
+
+        jsonHandlerHashMap.put( "/client/json/homework/get/", ( request, contents ) -> {
+            long userId = getUserIdFromCookie( request );
+            User user = User.findUser( userId );
+
+            long hwId = user.getHwGetTarget();
+
+            return Homework.getHomework( hwId ).toJsonObject().toJSONString();
+        } );
+
+//        jsonHandlerHashMap.put( "/client/json/homework/submit/", ( request, contents ) -> {
+//
+//        } );
 
         jsonHandlerHashMap.put( "/client/json/courseDesc/", ( ( request, contents ) -> {
 
@@ -271,6 +299,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         String signup = "/client/html/signup/index.html";
         String stumain = "/client/html/student/stumain/index.html";
         String teamain = "/client/html/teacher/teamain/index.html";
+        String hkGren = "/client/json/homework/generate/";
         //String tamain = "/client/html/teacher/teamain/index.html";
 //        String stuhw = "/client/json/homework/generate/";
 //        String stuhwList = "/client/json/homework/list/";
@@ -289,6 +318,21 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 return;
             }
         }
+//        } else if ( uri.equals( hkGren ) ) {
+//            homeworkGen( getPostInfo( content ) );
+//            long userId = getUserIdFromCookie( request );
+//            String newUri = "";
+//            if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
+//                newUri = "/client/html/teacher/teahomeworkmain/index.html";
+//            } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
+//                //newUri = "/client/html/"
+//            } else if ( STUDENT_ID.matcher( String.valueOf( userId ) ).matches() ) {
+//                newUri = "/client/html/student/stuhomeworkmain/index.html";
+//            }
+//            System.out.println( "new uri: " + newUri );
+//            this.sendRedirect( ctx, newUri );
+//            return;
+//        }
 
         handleGet( ctx, request, response );
     }
@@ -299,17 +343,25 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         final String uri = request.uri();
 
         String path = sanitizeUri( uri );
-        String classTarget;
 
         if ( CLASS_STR.matcher( path ).matches() ) {
-            classTarget = path.substring( path.lastIndexOf( "=" ) + 1 );
+            String classTarget = path.substring( path.lastIndexOf( "=" ) + 1 );
 
             long userId = getUserIdFromCookie( request );
 
             User tea = User.findUser( userId );
             tea.setClassPosition( classTarget );
-
             path = path.substring( 0, path.lastIndexOf( "?" ) );
+
+        } else if ( HK_STR.matcher( path ).matches() ) {
+            String hwTarget = path.substring( path.lastIndexOf( "=" ) + 1 );
+
+            long userId = getUserIdFromCookie( request );
+
+            User tea = User.findUser( userId );
+            tea.setHwGetTarget( Long.parseLong( hwTarget ) );
+            path = path.substring( 0, path.lastIndexOf( "?" ) );
+
         } else if ( EQUAL_STR.matcher( path ).matches() ) {
             path = path.substring( 0, path.lastIndexOf( "?" ) );
         }
@@ -517,7 +569,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             ByteBuf buffer = Unpooled.copiedBuffer( json, CharsetUtil.UTF_8 );
             response.content().writeBytes( buffer );
             buffer.release();
-
             this.sendAndCleanupConnection( ctx, response );
         }
     }

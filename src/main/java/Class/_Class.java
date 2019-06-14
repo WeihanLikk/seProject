@@ -80,7 +80,7 @@ public class _Class {
             jsonArray.add( jsonObject1 );
         }
 
-        jsonObject.put( "Homework List", jsonArray );
+        jsonObject.put( "homework_list", jsonArray );
         return jsonObject;
     }
 }

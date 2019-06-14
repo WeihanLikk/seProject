@@ -38,6 +38,12 @@ public class Homework {
         return homeworkList.size();
     }
 
+    public static Homework getHomework ( long id ) {
+        if ( homeworkList.containsKey( id ) ) {
+            return homeworkList.get( id );
+        }
+        return null;
+    }
 
     public long getId () {
         return id;
@@ -73,18 +79,39 @@ public class Homework {
 
     public JSONObject toJsonObject () {
         JSONObject jsonObject = new JSONObject( true );
-        JSONArray jsonArray = new JSONArray();
+
+        int numberChoice = 0;
+        int numberJudge = 0;
+
+        JSONObject choice = new JSONObject( true );
+        JSONObject judge = new JSONObject( true );
+        JSONArray choices = new JSONArray();
+        JSONArray judges = new JSONArray();
 
         for ( Question que : questionList
         ) {
-            jsonArray.add( que.toJsonObject() );
+            if ( que.getType().equals( "choice" ) ) {
+                numberChoice++;
+                choices.add( que.toJsonObject() );
+            } else {
+                numberJudge++;
+                judges.add( que.toJsonObject() );
+            }
         }
 
+        choice.put( "number", numberChoice );
+        choice.put( "problems", choices );
+
+        judge.put( "number", numberJudge );
+        judge.put( "problems", judges );
+
         jsonObject.put( "id", this.id );
-        jsonObject.put( "homework", jsonArray );
+        jsonObject.put( "name", this.name );
+        JSONObject hk = new JSONObject( true );
+        hk.put( "choice", choice );
+        hk.put( "judge", judge );
+        jsonObject.put( "homework", hk );
 
         return jsonObject;
     }
-
-
 }
