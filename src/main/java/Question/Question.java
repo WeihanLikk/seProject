@@ -130,6 +130,7 @@ public class Question {
 
     public JSONObject toJsonObject () {
         JSONObject question = new JSONObject( true );
+        question.put( "id", id );
         question.put( "content", content );
         if ( this.type.equals( "choice" ) ) {
             question.put( "choiceA", choices[ 0 ] );

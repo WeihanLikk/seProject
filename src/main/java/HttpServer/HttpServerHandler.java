@@ -91,6 +91,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 Question question = Question.getQuestion( Long.parseLong( contents[ i ] ) );
                 if ( question != null ) {
                     homework.addQuestion( question );
+                    System.out.println( "Question add: " + question.getId() );
                 } else {
                     System.out.println( "Question id: " + contents[ i ] + " not exist!" );
                 }
@@ -139,15 +140,26 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         jsonHandlerHashMap.put( "/client/json/homework/get/", ( request, contents ) -> {
             long userId = getUserIdFromCookie( request );
             User user = User.findUser( userId );
-
             long hwId = user.getHwGetTarget();
+
+            //System.out.println( Homework.getHomework( hwId ).toJsonObject().toJSONString() );
 
             return Homework.getHomework( hwId ).toJsonObject().toJSONString();
         } );
 
-//        jsonHandlerHashMap.put( "/client/json/homework/submit/", ( request, contents ) -> {
-//
-//        } );
+        jsonHandlerHashMap.put( "/client/json/homework/submit/", ( request, contents ) -> {
+            int mark = 0;
+            int number = contents.length / 2;
+            for ( int i = 0; i < contents.length / 2; i++ ) {
+                Question question = Question.getQuestion( Long.parseLong( contents[ i ] ) );
+                //questions.add( Question.getQuestion( Long.parseLong( contents[ i ] ) ) );
+                mark += question.judge( contents[ i + number ] );
+            }
+
+            System.out.println( "mark is: " + mark );
+
+            return String.valueOf( mark );
+        } );
 
         jsonHandlerHashMap.put( "/client/json/courseDesc/", ( ( request, contents ) -> {
 
@@ -170,7 +182,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             JSONObject classDesc = new JSONObject( true );
             classDesc.put( "description", _Class.get_Class( classId ).getDescription() );
 
-            System.out.println( classDesc.toJSONString() );
+            //System.out.println( classDesc.toJSONString() );
 
 
             return classDesc.toJSONString();
@@ -295,11 +307,11 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         String content = request.content().toString( CharsetUtil.UTF_8 );//.split( "&" );
 
+        //System.out.println( "check post content: " + content );
         String signin = "/client/html/signin/index.html";
         String signup = "/client/html/signup/index.html";
         String stumain = "/client/html/student/stumain/index.html";
         String teamain = "/client/html/teacher/teamain/index.html";
-        String hkGren = "/client/json/homework/generate/";
         //String tamain = "/client/html/teacher/teamain/index.html";
 //        String stuhw = "/client/json/homework/generate/";
 //        String stuhwList = "/client/json/homework/list/";
@@ -318,21 +330,6 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
                 return;
             }
         }
-//        } else if ( uri.equals( hkGren ) ) {
-//            homeworkGen( getPostInfo( content ) );
-//            long userId = getUserIdFromCookie( request );
-//            String newUri = "";
-//            if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
-//                newUri = "/client/html/teacher/teahomeworkmain/index.html";
-//            } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
-//                //newUri = "/client/html/"
-//            } else if ( STUDENT_ID.matcher( String.valueOf( userId ) ).matches() ) {
-//                newUri = "/client/html/student/stuhomeworkmain/index.html";
-//            }
-//            System.out.println( "new uri: " + newUri );
-//            this.sendRedirect( ctx, newUri );
-//            return;
-//        }
 
         handleGet( ctx, request, response );
     }
