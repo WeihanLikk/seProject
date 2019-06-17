@@ -68,6 +68,11 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             ArrayList<_Class> arrayList = User.findUser( userId ).getClassArrayList();
 
+            if ( arrayList == null ) {
+                System.out.println( "null in course json" );
+                return "";
+            }
+
             JSONObject jsonObject = new JSONObject( true );
             JSONArray classes = new JSONArray();
             for ( _Class co : arrayList ) {
@@ -99,16 +104,9 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             long userId = getUserIdFromCookie( request );
             User user = User.findUser( userId );
-            String tableType = "fuck";
-            if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
-                tableType = "TEACLASS";
-            } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
-                tableType = "TACLASS";
-            }
-
             //System.out.println( user.getId() + " " + user.getClassPosition() + " " + tableType );
 
-            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), tableType );
+            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), getTableType( userId ) );
 
             //System.out.println( "Classid: " + classId );
 
@@ -123,16 +121,8 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
         jsonHandlerHashMap.put( "/client/json/homework/list/", ( request, contents ) -> {
             long userId = getUserIdFromCookie( request );
             User user = User.findUser( userId );
-            String tableType = "fuck";
-            if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
-                tableType = "TEACLASS";
-            } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
-                tableType = "TACLASS";
-            } else if ( STUDENT_ID.matcher( String.valueOf( userId ) ).matches() ) {
-                tableType = "STUCLASS";
-            }
 
-            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), tableType );
+            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), getTableType( userId ) );
 
             return _Class.get_Class( classId ).toHomeworkList().toJSONString();
         } );
@@ -167,17 +157,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
             User user = User.findUser( userId );
 
-            String tableType = "";
-            if ( STUDENT_ID.matcher( String.valueOf( userId ) ).matches() ) {
-                tableType = "STUCLASS";
-            } else if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
-                tableType = "TEACLASS";
-            } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
-                tableType = "TACLASS";
-            }
-
-
-            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), tableType );
+            long classId = DataBase.selectClassIdByUserAndClassName( user.getId(), user.getClassPosition(), getTableType( userId ) );
 
             JSONObject classDesc = new JSONObject( true );
             classDesc.put( "description", _Class.get_Class( classId ).getDescription() );
@@ -190,9 +170,108 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         jsonHandlerHashMap.put( "/client/resources/files/", ( ( request1, contents ) -> FileManger.toJsonList().toJSONString() ) );
 
+        jsonHandlerHashMap.put( "/client/json/student/add/", ( request, contents ) -> {
+            ArrayList<User> users = new ArrayList<>();
+            for ( int i = 0; i < contents.length - 1; i += 2 ) {
+                System.out.println( contents[ i + 1 ] );
+                User us = User.findUser( Long.parseLong( contents[ i + 1 ] ) );
+                if ( us != null ) {
+                    users.add( us );
+                } else {
+                    return "userId: " + contents[ i + 1 ] + " not exist!\n";
+                }
+            }
+
+            long userId = getUserIdFromCookie( request );
+            User teaUser = User.findUser( userId );
+
+            long classId = DataBase.selectClassIdByUserAndClassName( teaUser.getId(), teaUser.getClassPosition(), getTableType( userId ) );
+
+            db.insertUserIntoClass( users, _Class.get_Class( classId ), "STUCLASS" );
+
+            return "success";
+        } );
+
+        jsonHandlerHashMap.put( "/client/json/student/delete/", ( request, contents ) -> {
+            ArrayList<User> users = new ArrayList<>();
+            for ( int i = 0; i < contents.length - 1; i += 2 ) {
+                User us = User.findUser( Long.parseLong( contents[ i + 1 ] ) );
+                if ( us != null ) {
+                    users.add( us );
+                } else {
+                    return "userId: " + contents[ i + 1 ] + " not exist!\n";
+                }
+            }
+
+            long userId = getUserIdFromCookie( request );
+            User teaUser = User.findUser( userId );
+
+            long classId = DataBase.selectClassIdByUserAndClassName( teaUser.getId(), teaUser.getClassPosition(), getTableType( userId ) );
+
+            db.deleteUserFromClass( users, _Class.get_Class( classId ), "STUCLASS" );
+
+            return "success";
+        } );
+
+        jsonHandlerHashMap.put( "/client/json/ta/add/", ( request, contents ) -> {
+            ArrayList<User> users = new ArrayList<>();
+            for ( int i = 0; i < contents.length - 1; i += 2 ) {
+                User us = User.findUser( Long.parseLong( contents[ i + 1 ] ) );
+                if ( us != null ) {
+                    users.add( us );
+                } else {
+                    return "userId: " + contents[ i + 1 ] + " not exist!\n";
+                }
+            }
+
+            long userId = getUserIdFromCookie( request );
+            User teaUser = User.findUser( userId );
+
+            long classId = DataBase.selectClassIdByUserAndClassName( teaUser.getId(), teaUser.getClassPosition(), getTableType( userId ) );
+
+            db.insertUserIntoClass( users, _Class.get_Class( classId ), "TACLASS" );
+
+            return "success";
+        } );
+
+        jsonHandlerHashMap.put( "/client/json/student/delete/", ( request, contents ) -> {
+            ArrayList<User> users = new ArrayList<>();
+            for ( int i = 0; i < contents.length - 1; i += 2 ) {
+                User us = User.findUser( Long.parseLong( contents[ i + 1 ] ) );
+                if ( us != null ) {
+                    users.add( us );
+                } else {
+                    return "userId: " + contents[ i + 1 ] + " not exist!\n";
+                }
+            }
+
+            long userId = getUserIdFromCookie( request );
+            User teaUser = User.findUser( userId );
+
+            long classId = DataBase.selectClassIdByUserAndClassName( teaUser.getId(), teaUser.getClassPosition(), getTableType( userId ) );
+
+            db.deleteUserFromClass( users, _Class.get_Class( classId ), "TACLASS" );
+
+            return "success";
+        } );
+
     }
 
     private FullHttpRequest request;
+
+    private static String getTableType ( long userId ) {
+        String tableType = "";
+        if ( STUDENT_ID.matcher( String.valueOf( userId ) ).matches() ) {
+            tableType = "STUCLASS";
+        } else if ( TEACHER_ID.matcher( String.valueOf( userId ) ).matches() ) {
+            tableType = "TEACLASS";
+        } else if ( TA_ID.matcher( String.valueOf( userId ) ).matches() ) {
+            tableType = "TACLASS";
+        }
+
+        return tableType;
+    }
+
 
     private static String sanitizeUri ( String uri ) {
         // Decode the path.
@@ -307,11 +386,13 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
         String content = request.content().toString( CharsetUtil.UTF_8 );//.split( "&" );
 
-        //System.out.println( "check post content: " + content );
+        System.out.println( "check post content: " + content );
         String signin = "/client/html/signin/index.html";
         String signup = "/client/html/signup/index.html";
         String stumain = "/client/html/student/stumain/index.html";
         String teamain = "/client/html/teacher/teamain/index.html";
+        String tamain = "/client/html/ta/tamain/index.html";
+        String stuAdd = "/client/json/addStudent/";
         //String tamain = "/client/html/teacher/teamain/index.html";
 //        String stuhw = "/client/json/homework/generate/";
 //        String stuhwList = "/client/json/homework/list/";
@@ -319,12 +400,13 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
 
 
         String uri = request.uri();
+        System.out.println( uri );
         if ( uri.equals( signin ) ) {
             if ( userRegister( getPostInfo( content ) ) == -1 ) {
                 this.sendRedirect( ctx, signup );
                 return;
             }
-        } else if ( uri.equals( stumain ) || uri.equals( teamain ) ) {
+        } else if ( uri.equals( stumain ) || uri.equals( teamain ) || uri.equals( tamain ) ) {
             if ( userLogin( getPostInfo( content ), response, request ) == -1 ) {
                 this.sendRedirect( ctx, signin );
                 return;

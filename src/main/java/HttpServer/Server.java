@@ -28,6 +28,7 @@ public class Server {
                     .sslProvider( SslProvider.JDK ).build();
         } else {
             sslCtx = null;
+            System.out.println( "ssl is null" );
         }
 
         DataBase.loadInfo();

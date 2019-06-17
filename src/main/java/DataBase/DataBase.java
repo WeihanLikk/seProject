@@ -286,7 +286,8 @@ public class DataBase {
                 " ( UserID      LONG      NOT NULL," +
                 "   ClassID     LONG      NOT NULL, " +
                 "   ClassName   VARCHAR(50) NOT NULL," +
-                "   ClassDesc   VARCHAR(100)     DEFAULT NULL)";
+                "   ClassDesc   VARCHAR(100)     DEFAULT NULL," +
+                "   PRIMARY KEY (UserID, ClassID))";
 
         Statement stmt = c.createStatement();
 
@@ -411,6 +412,77 @@ public class DataBase {
 
         return 0;
     }
+
+
+    public int insertUserIntoClass ( ArrayList<User> students, _Class _class, String tableType ) throws SQLException {
+//        ArrayList<User> users = selectUserFromUserClass( "STUCLASS", _class.getId(), 1 );
+//
+//        if ( users.size() != 0 ) {
+//            return -1;
+//        }
+        String sql = "INSERT OR REPLACE INTO " + tableType + " (UserID, ClassID,ClassName, ClassDesc)VALUES(?,?,?,?)";
+        int count = 0;
+        PreparedStatement ps = null;
+        for ( User stu : students
+        ) {
+            ps = c.prepareStatement( sql );
+            ps.setLong( 1, stu.getId() );
+            ps.setLong( 2, _class.getId() );
+            ps.setString( 3, _class.getName() );
+            ps.setString( 4, _class.getDescription() );
+
+            count += ps.executeUpdate();
+        }
+
+        ps.close();
+        System.out.println( "Insert into table " + tableType + count + " records" );
+        return 0;
+    }
+
+    public int deleteUserFromClass ( ArrayList<User> users, _Class _class, String tableType ) throws SQLException {
+//        ArrayList<User> users = selectUserFromUserClass( "STUCLASS", _class.getId(), 1 );
+//
+//        if ( users.size() != 0 ) {
+//            return -1;
+//        }
+        String sql = "DELETE FROM " + tableType + " WHERE UserID = ? AND ClassID = ?";
+        int count = 0;
+        PreparedStatement ps = null;
+        for ( User stu : users
+        ) {
+            ps = c.prepareStatement( sql );
+            ps.setLong( 1, stu.getId() );
+            ps.setLong( 2, _class.getId() );
+
+            count += ps.executeUpdate();
+        }
+
+        ps.close();
+        System.out.println( "delete from table " + tableType + count + " records" );
+        return 0;
+    }
+
+    public ArrayList<User> selectUserFromUserClass ( String typeTable, long id, long userId ) throws SQLException {
+        String sql = "SELECT * FROM " + typeTable + " WHERE ClassID = ? AND UserID = ?";
+
+        PreparedStatement ps = c.prepareStatement( sql );
+        ps.setLong( 1, id );
+        ps.setLong( 2, userId );
+        ResultSet rs = ps.executeQuery();
+
+        ArrayList<User> users = new ArrayList<>();
+
+        while ( rs.next() ) {
+            users.add( new User(
+                    rs.getLong( "UserID" ), "", "", ""
+            ) );
+        }
+
+        ps.close();
+        rs.close();
+        return users;
+    }
+
 
     public ArrayList<_Class> selectClassInfoByID ( long id ) throws SQLException {
         String sql = "SELECT * FROM CLASS WHERE ClassID = ?";
