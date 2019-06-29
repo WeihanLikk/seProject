@@ -628,7 +628,7 @@ public class HttpServerHandler extends SimpleChannelInboundHandler<FullHttpReque
             Cookie cookie = new DefaultCookie( "userKey", user.getId().toString() );
             System.out.println( "fuck value 2: " + user.getId() );
             cookie.setPath( "/" );
-            cookie.setDomain( "localhost" );
+            cookie.setDomain( "www.zjudream.top" );
             response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( cookie ) );
             //response.headers().add( HttpHeaderNames.SET_COOKIE, ServerCookieEncoder.STRICT.encode( "key2", "value2" ) );
         }
